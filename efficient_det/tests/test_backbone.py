@@ -6,13 +6,13 @@ from efficient_det.model.components.backbone import Backbone
 
 @pytest.mark.skip(reason='Takes a long time to run')
 def test_can_build_backbones(valid_model_names):
-    for valid_model_name in valid_model_names:
-        Backbone(valid_model_name)
+    for phi in range(8):
+        Backbone(phi)
 
 
 @pytest.fixture(scope='module')
 def efficientnet_b0():
-    model = Backbone('b0')
+    model = Backbone(0)
     yield model
 
 
@@ -32,12 +32,12 @@ def test_inference_same(efficientnet_b0):
     out_0 = efficientnet_b0(random_image_tensor, training=False)
     out_1 = efficientnet_b0(random_image_tensor, training=False)
     for o0, o1 in zip(out_0, out_1):
-        assert tf.reduce_all(o1 == o0)
+        assert tf.reduce_all(o1 == o0).numpy()
 
 
-def test_train_not_same(efficientnet_b0, random_image_tensor):
+def test_train_not_same(efficientnet_b0):
     random_image_tensor = tf.random.uniform((1, 256, 256, 3), )
     out_0 = efficientnet_b0(random_image_tensor, training=True)[-1]
     out_1 = efficientnet_b0(random_image_tensor, training=True)[-1]
-    assert tf.reduce_any(out_0 != out_1).numpy()
+    assert not tf.reduce_all(out_0 == out_1).numpy()
 

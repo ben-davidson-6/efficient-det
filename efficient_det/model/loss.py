@@ -1,5 +1,27 @@
 import tensorflow as tf
 
+from efficient_det.model.components.detection_head import number_of_classifications
+
+
+class Loss(tf.keras.losses.Loss):
+    def __init__(self, focal_loss, box_loss, weights, num_classes, num_anchors):
+        self.focal_loss = focal_loss
+        self.box_loss = box_loss
+        self.weights = weights
+        self.number_of_classifications = number_of_classifications(num_classes, num_anchors)
+
+    def split_prediction(self, y_pred):
+        y_pred_class = y_pred[..., :self.number_of_classifications]
+        y_pred_regression = y_pred[..., self.number_of_classifications:]
+        return y_pred_class, y_pred_regression
+
+    def call(self, y_true, y_pred):
+        y_true_class, y_true_regression = y_true
+        y_pred_class, y_pred_regression = self.split_prediction(y_pred)
+        fl = self.focal_loss(y_true_class, y_pred_class) * self.weights[0]
+        bl = self.box_loss(y_true_regression, y_pred_regression) * self.weights[1]
+        return fl + bl
+
 
 class NormalisationMixin:
     def normalization(self, y_true):
@@ -51,8 +73,10 @@ class BoxRegressionLoss(NormalisationMixin, tf.keras.losses.Loss):
     def call(self, y_true, y_pred):
         weight = self.normalization(y_true)
         target_mask = self.actual_target_mask(y_true)
-        self.huber_loss(y_true, y_pred, weight)
+        return self.huber_loss(y_true, y_pred, weight)
 
 
-class BoxIOULoss(tf.keras.losses.Loss):
-    pass
+def loss(num_classes, num_anchors, weights, alpha, gamma, label_smoothing=0.0, normalise=True):
+    fl = FocalLoss(alpha, gamma, normalise, label_smoothing)
+    bl = BoxRegressionLoss(normalise)
+    return Loss(fl, bl, weights, num_classes, num_anchors)

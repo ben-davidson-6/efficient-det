@@ -4,7 +4,6 @@ import math
 from efficient_det.model.components.backbone import Backbone
 from efficient_det.model.components.bifpn import BiFPN
 from efficient_det.model.components.detection_head import DetectionHead
-from efficient_det.model.loss import FocalLoss, BoxRegressionLoss, BoxIOULoss
 
 
 class EfficientDet(tf.keras.Model):
@@ -35,6 +34,7 @@ class EfficientDet(tf.keras.Model):
         x = self.bifpn(x, training)
         x = self.detection_head(x, training)
         return x
+
 
 
 

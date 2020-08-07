@@ -1,10 +1,15 @@
 import tensorflow as tf
 
 
+def number_of_classifications(num_class, num_anchors):
+    """function to make it clear what is goin on in other classes/modules"""
+    return num_class*num_anchors
+
+
 class DetectionHead(tf.keras.layers.Layer):
     def __init__(self, num_class, num_anchors, repeats, dropout_rate=0.2, depth=32):
         super(DetectionHead, self).__init__()
-        self.num_classifications = num_class*num_anchors
+        self.num_classifications = number_of_classifications(num_class, num_anchors)
         self.num_anchors = num_anchors*4
         num_predictions = self.num_classifications + self.num_anchors
         self.fully_connected_head = FullyConnectedHead(num_predictions, repeats, dropout_rate, depth)
