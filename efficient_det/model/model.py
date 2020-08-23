@@ -6,9 +6,9 @@ from efficient_det.model.components.bifpn import BiFPN
 from efficient_det.model.components.detection_head import DetectionHead
 
 
-class EfficientDet(tf.keras.Model):
+class EfficientDetNetwork(tf.keras.Model):
     def __init__(self, phi, num_classes, num_anchors):
-        super(EfficientDet, self).__init__()
+        super(EfficientDetNetwork, self).__init__()
         self.num_classes = num_classes
         self.num_anchors = num_anchors
 

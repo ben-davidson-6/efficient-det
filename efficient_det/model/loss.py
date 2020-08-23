@@ -1,23 +1,16 @@
 import tensorflow as tf
 
-from efficient_det.model.components.detection_head import number_of_classifications
 
-
-class Loss(tf.keras.losses.Loss):
-    def __init__(self, focal_loss, box_loss, weights, num_classes, num_anchors):
+class EfficientDetLoss(tf.keras.losses.Loss):
+    def __init__(self, focal_loss, box_loss, weights):
+        super(EfficientDetLoss, self).__init__(name='efficient_det_loss')
         self.focal_loss = focal_loss
         self.box_loss = box_loss
         self.weights = weights
-        self.number_of_classifications = number_of_classifications(num_classes, num_anchors)
-
-    def split_prediction(self, y_pred):
-        y_pred_class = y_pred[..., :self.number_of_classifications]
-        y_pred_regression = y_pred[..., self.number_of_classifications:]
-        return y_pred_class, y_pred_regression
 
     def call(self, y_true, y_pred):
         y_true_class, y_true_regression = y_true
-        y_pred_class, y_pred_regression = self.split_prediction(y_pred)
+        y_pred_class, y_pred_regression = y_pred
         fl = self.focal_loss(y_true_class, y_pred_class) * self.weights[0]
         bl = self.box_loss(y_true_regression, y_pred_regression) * self.weights[1]
         return fl + bl
@@ -26,7 +19,7 @@ class Loss(tf.keras.losses.Loss):
 class NormalisationMixin:
     def normalization(self, y_true):
         if self.normalize:
-            weight = 1./tf.reduce_mean(y_true)
+            weight = tf.math.divide_no_nan(1., tf.reduce_mean(y_true))
         else:
             weight = None
         return weight
@@ -66,17 +59,14 @@ class BoxRegressionLoss(NormalisationMixin, tf.keras.losses.Loss):
         self.huber_loss = tf.keras.losses.Huber(delta=0.1)
         self.normalize = normalize
 
-    @staticmethod
-    def pull_out_actual_boxes(self, y_true):
-        return tf.not_equal(y_true, 0.0)
-
     def call(self, y_true, y_pred):
+        # todo add the filtering for masks which we
+        #  care about and the exponential size
         weight = self.normalization(y_true)
-        target_mask = self.actual_target_mask(y_true)
         return self.huber_loss(y_true, y_pred, weight)
 
 
-def loss(num_classes, num_anchors, weights, alpha, gamma, label_smoothing=0.0, normalise=True):
+def loss(weights, alpha, gamma, label_smoothing=0.0, normalise=True):
     fl = FocalLoss(alpha, gamma, normalise, label_smoothing)
     bl = BoxRegressionLoss(normalise)
-    return Loss(fl, bl, weights, num_classes, num_anchors)
+    return EfficientDetLoss(fl, bl, weights)

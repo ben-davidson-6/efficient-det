@@ -1,0 +1,1 @@
+from efficient_det.model.model import EfficientDetNetwork

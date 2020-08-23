@@ -1,16 +1,11 @@
 import tensorflow as tf
 
 
-def number_of_classifications(num_class, num_anchors):
-    """function to make it clear what is goin on in other classes/modules"""
-    return num_class*num_anchors
-
-
 class DetectionHead(tf.keras.layers.Layer):
-    def __init__(self, num_class, num_anchors, repeats, dropout_rate=0.2, depth=32):
+    def __init__(self, num_class, num_anchors_per_pixel, repeats, dropout_rate=0.2, depth=32):
         super(DetectionHead, self).__init__()
-        self.num_classifications = number_of_classifications(num_class, num_anchors)
-        self.num_anchors = num_anchors*4
+        self.num_classifications = num_class * num_anchors_per_pixel
+        self.num_anchors = num_anchors_per_pixel * 4
         num_predictions = self.num_classifications + self.num_anchors
         self.fully_connected_head = FullyConnectedHead(num_predictions, repeats, dropout_rate, depth)
 
@@ -18,10 +13,15 @@ class DetectionHead(tf.keras.layers.Layer):
         seperated = []
         mixed_outputs = self.fully_connected_head(inputs, training)
         for output in mixed_outputs:
-            classifications = output[..., :self.num_classifications]
-            regressions = output[..., self.num_classifications:]
+            classifications, regressions = self._reshape_output(output)
             seperated.append((classifications, regressions))
         return seperated
+
+    def _reshape_output(self, output):
+        classifications = output[..., :self.num_classifications]
+        regressions = output[..., self.num_classifications:]
+        regressions = tf.stack(tf.split(regressions, num_or_size_splits=self.num_anchors, axis=-1), axis=-1)
+        return classifications, regressions
 
 
 class FullyConnectedHead(tf.keras.layers.Layer):

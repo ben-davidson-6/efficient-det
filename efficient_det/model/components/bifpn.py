@@ -7,14 +7,14 @@ class BiFPN(tf.keras.layers.Layer):
         self.depth = depth
         self.repeats = repeats
         self.shared = shared
-        self.bifpn_layers = [self.build_bifpn_layer() for _ in range(self.repeats)]
+        self.bifpn_layers = [self.get_bifpn_layer() for _ in range(self.repeats)]
 
     def call(self, x, training=None):
         for l in self.bifpn_layers:
             x = l(x, training)
         return x
 
-    def build_bifpn_layer(self):
+    def get_bifpn_layer(self):
         return BiFPNLayer(self.depth)
 
 
