@@ -27,6 +27,8 @@ class EfficientDetAnchors:
         regressions : list of arrays of shape [batch_size, h_i, w_i, n, 4]
             each box must be written (ox, oy, sx, sy) where exp(sx) and exp(sy)
             scale default height and width, and ox, oy offset default centroids
+            with default centroids being defined by the leve/stride implicit in the
+            list.
 
         Returns
         -------
@@ -36,7 +38,30 @@ class EfficientDetAnchors:
         for level, regression in enumerate(regressions):
             yield self._regress_to_absolute_individual_level(level, regression)
 
-    def absolute_to_regression(self, absolute):
+    def absolute_to_regression(self, absolute, classes):
+        """
+        Take a tensor of bounding boxes in the form [nboxes, ymin, xmin, ymax, xmax]
+        and their corresponding classes [nboxes] return a list of tensors like
+        [h, w, class, nanchors, 4] with the required offsets, where the class may
+        for each level be nan indicating that no object sufficiently overlaps with
+        a default box there.
+
+        Note that this entails a choice, as two boxes could sufficiently overlap, in
+        such a case we take the box with the best overlap or randomly if equal
+
+        Note here we need to know how many levels the model has, we should probably read this
+        from the model.
+
+        the idea is to run this offline, transforming the dataset ahead of time, so that
+        in the training loop we can just read the tensors
+        Parameters
+        ----------
+        absolute
+
+        Returns
+        -------
+
+        """
         raise NotImplemented
 
     def _regress_to_absolute_individual_level(self, level, regression):
