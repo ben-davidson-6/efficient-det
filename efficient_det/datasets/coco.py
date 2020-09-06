@@ -38,6 +38,7 @@ for example in val_ds:
         colors,
     )[0]
 
+
     absos = anchors.calculate_and_return_absolute_tlbr_boxes(gt_boxes)
     absos /= tf.constant([height, width, height, width], dtype=tf.float32)[None]
     anchor_bbox_image = tf.image.draw_bounding_boxes(
