@@ -45,7 +45,7 @@ class FocalLoss(NormalisationMixin, tf.keras.losses.Loss):
         modulating = (1.0 - p_t) ** self.gamma
         return alpha * modulating
 
-    def call(self, y_true, y_pred):
+    def call(self, y_true, y_pred, sample_weight=None):
         pred_prob = tf.nn.sigmoid(y_pred)
         focal_coeff = self.calc_focal_coeff(y_true, pred_prob)
         sample_weight = self.normalization(y_true)
@@ -54,12 +54,12 @@ class FocalLoss(NormalisationMixin, tf.keras.losses.Loss):
 
 
 class BoxRegressionLoss(NormalisationMixin, tf.keras.losses.Loss):
-    def __init__(self, normalize=True):
+    def __init__(self, delta, normalize=True):
         super(BoxRegressionLoss, self).__init__(name='box_regression')
-        self.huber_loss = tf.keras.losses.Huber(delta=0.1)
+        self.huber_loss = tf.keras.losses.Huber(delta)
         self.normalize = normalize
 
-    def call(self, y_true, y_pred):
+    def call(self, y_true, y_pred, sample_weight=None):
         # todo add the filtering for masks which we
         #  care about and the exponential size
         weight = self.normalization(y_true)

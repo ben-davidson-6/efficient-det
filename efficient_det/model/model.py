@@ -7,11 +7,11 @@ from efficient_det.model.components.detection_head import DetectionHead
 
 
 class EfficientDetNetwork(tf.keras.Model):
-    def __init__(self, phi, num_classes, num_anchors):
+    def __init__(self, phi, num_classes, anchors):
         super(EfficientDetNetwork, self).__init__()
         self.num_classes = num_classes
-        self.num_anchors = num_anchors
-
+        self.num_anchors = anchors.num_boxes()
+        self.anchors = anchors
         self.phi = phi
         self.backbone = self.get_backbone()
         self.bifpn = self.get_bifpn()

@@ -2,7 +2,7 @@ import pytest
 import tensorflow as tf
 import numpy as np
 
-from efficient_det.model.anchor import EfficientDetAnchors
+from efficient_det.model.anchor import EfficientDetAnchors, Boxes
 
 
 def test_row_col_grid():
@@ -26,8 +26,8 @@ def random_regression():
     # batch, height, width, n, box
     tensor = tf.random.uniform([1, 2, 2, 1, 4])
     desired_x = tf.constant([
-            [0, 8],
-            [0, 8.]
+            [4, 12],
+            [4, 12.]
         ])
     desired_y = tf.transpose(desired_x)
     desired = tf.stack([desired_x, desired_y], axis=-1)[None, :, :, None]
@@ -68,4 +68,40 @@ def test_regressed_shapes():
     expected_shape = tf.constant([scale_x*8, scale_y*8])/2
     tf.debugging.assert_near(box_shape, expected_shape)
 
+
+def test_boxes_as_centroids():
+    boxes = Boxes(1, 1, tf.constant([[0, 0, 1, 1]], dtype=tf.float32), tf.constant([1]))
+    boxes_in_alternate_formed = boxes.boxes_as_centroid_and_widths()
+    expected = tf.constant([[0.5, 0.5, 0.5, 0.5]], dtype=tf.float32)
+    tf.debugging.assert_near(expected, boxes_in_alternate_formed)
+
+
+def test_box_area():
+    boxes = tf.constant([
+        [0, 0, 1, 1],
+        [0, 0, 2., 3],
+        [3, 3, 6, 6],
+        [4, 4, 2, 2]
+    ])
+    expected_areas = tf.constant([1, 6, 9., 0])
+    areas = Boxes.box_area(boxes)
+    tf.debugging.assert_near(areas, expected_areas)
+
+
+def test_box_to_regression_and_back():
+
+    image_height = 100
+    image_width = 100
+    width = 32
+    level = 2
+    box = [32, 32, 32 + width, 32 + width]
+    expected_regression = tf.constant([0, 0, 0, 0.])
+    boxes = Boxes(image_height, image_width, tf.constant([box], dtype=tf.float32), tf.constant([1]))
+
+    anchors = EfficientDetAnchors(size=1, aspects=[(1, 1.)], num_levels=3, iou_match_thresh=0.)
+
+    label, regressions = anchors._assign_boxes_to_level(boxes, level)
+    tf.debugging.assert_near(regressions[0, 1, 1, 0], tf.constant(expected_regression))
+    box_from_regree = anchors._regress_to_absolute_tlbr(level, regressions)[0, 1, 1, 0]
+    tf.debugging.assert_near(tf.cast(box, tf.float32), box_from_regree)
 

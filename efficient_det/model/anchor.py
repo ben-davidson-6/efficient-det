@@ -5,6 +5,7 @@ class Boxes:
     def __init__(self, image_height, image_width, box_tensor, classes):
         """
         the box tensor should be of the form [nboxes, ymin, xmin, ymax, xmax]
+        in unnormalised form!
 
         Parameters
         ----------
@@ -18,27 +19,34 @@ class Boxes:
         self.image_height = image_height
         self.image_width = image_width
 
+    def unnormalise(self):
+        unnormalisation = tf.constant(
+            [[self.image_height, self.image_width, self.image_height, self.image_width]],
+            dtype=tf.float32)
+        self.box_tensor *= unnormalisation
+
     def get_image_dimensions(self):
         return self.image_width, self.image_height
 
     def boxes_as_centroid_and_widths(self):
         centroid_x = (self.box_tensor[:, 1] + self.box_tensor[:, 3])/2
         centroid_y = (self.box_tensor[:, 0] + self.box_tensor[:, 2])/2
-        sx = self.box_tensor[:, 3] - self.box_tensor[:, 1]
-        sy = self.box_tensor[:, 2] - self.box_tensor[:, 0]
+        sx = (self.box_tensor[:, 3] - self.box_tensor[:, 1])/2
+        sy = (self.box_tensor[:, 2] - self.box_tensor[:, 0])/2
         return tf.stack([centroid_x, centroid_y, sx, sy], axis=-1)
 
     @staticmethod
-    def _anchor_boxes_as_tlbr_box(anchor_boxes):
+    def absolute_as_tlbr(anchor_boxes):
         cx, cy, sx, sy = tf.split(anchor_boxes, num_or_size_splits=4, axis=-1)
         ymin = cy - sy
         ymax = cy + sy
         xmin = cx - sx
         xmax = cx + sx
-        return tf.stack([ymin, xmin, ymax, xmax], axis=-1)
+        return tf.concat([ymin, xmin, ymax, xmax], axis=-1)
 
     def match_with_anchor(self, anchor_boxes):
         """
+        taken from https://github.com/venuktan/Intersection-Over-Union/blob/master/iou_benchmark.py
 
         Parameters
         ----------
@@ -51,7 +59,7 @@ class Boxes:
             the iou for each box
 
         """
-        anchor_boxes_original = Boxes._anchor_boxes_as_tlbr_box(anchor_boxes)
+        anchor_boxes_original = Boxes.absolute_as_tlbr(anchor_boxes)
         anchor_original_shape = tf.shape(anchor_boxes_original)
         anchor_h, anchor_w, n_anchors = anchor_original_shape[0], anchor_original_shape[1], anchor_original_shape[2]
         anchor_boxes = tf.reshape(anchor_boxes_original, [-1, 4])
@@ -77,19 +85,19 @@ class Boxes:
         best_box = tf.argmax(iou, axis=0)
 
         best_box_class = tf.gather(self.classes, best_box)
-        best_iou = tf.gather(iou, best_box)
+        best_iou = tf.reduce_max(iou, axis=0)
         best_boxes = tf.gather(self.boxes_as_centroid_and_widths(), best_box)
 
         return best_box_class, best_iou, best_boxes
 
     @staticmethod
     def get_box_components(box):
-        return tf.split(box, num_or_size_splits=4, axis=-1)
+        return [x[..., 0] for x in tf.split(box, num_or_size_splits=4, axis=-1, )]
 
     @staticmethod
     def box_area(boxes):
         ymin, xmin, ymax, xmax = Boxes.get_box_components(boxes)
-        return tf.maximum((xmax - xmin + 1), 0) * tf.maximum((ymax - ymin + 1), 0)
+        return tf.maximum((xmax - xmin), 0) * tf.maximum((ymax - ymin), 0)
 
 
 class EfficientDetAnchors:
@@ -120,6 +128,9 @@ class EfficientDetAnchors:
             (cx, cy, w/2, h/2) center x, y and widht and height in pixels
         """
         for level, regression in enumerate(regressions):
+            # add fake batch
+            if regression.ndim == 4:
+                regression = tf.expand_dims(regression, axis=0)
             yield self._regress_to_absolute_individual_level(level, regression)
 
     def absolute_to_regression(self, boxes):
@@ -156,14 +167,26 @@ class EfficientDetAnchors:
         for level in range(self.num_levels):
             yield self._assign_boxes_to_level(boxes, level)
 
+    def calculate_and_return_absolute_tlbr_boxes(self, gt_boxes):
+        tlbr_boxes = []
+        for level, (label, regression) in enumerate(self.absolute_to_regression(gt_boxes)):
+            boxes = self._regress_to_absolute_tlbr(level, regression)
+            out = tf.boolean_mask(boxes, label != -1)
+            tlbr_boxes.append(out)
+        return tf.concat(tlbr_boxes, axis=0)
+
     def _regress_to_absolute_individual_level(self, level, regression):
         default_boxes = self._default_boxes_for_regression(level, regression)
         offset, scale = tf.split(regression, num_or_size_splits=2, axis=-1)
         centroid, dimensions = tf.split(default_boxes, num_or_size_splits=2, axis=-1)
         regressed_centroids = centroid + offset
         regressed_dimensions = EfficientDetAnchors._scale_width_and_height(dimensions, scale)
-        regressions = tf.concat([regressed_centroids, regressed_dimensions], axis=-1)
-        return regressions
+        absolutes = tf.concat([regressed_centroids, regressed_dimensions], axis=-1)
+        return absolutes
+
+    def _regress_to_absolute_tlbr(self, level, regression):
+        absolutes = self._regress_to_absolute_individual_level(level, regression)
+        return Boxes.absolute_as_tlbr(absolutes)
 
     def _assign_boxes_to_level(self, boxes, level):
         """
@@ -179,14 +202,14 @@ class EfficientDetAnchors:
 
         Returns
         -------
-        regressions : tensors of shape [h_i, w_i, n, 4] corresponding to the regressions
+        regressions : tensors of shape [1, h_i, w_i, n, 4] corresponding to the regressions
         classes : integer tensor of shape [h_i, w_i, n] indication the classes with nan indicating a negative
         """
         default_boxes = self._default_boxes_for_absolute(level, boxes)
         best_box_classes, best_ious, best_boxes = boxes.match_with_anchor(default_boxes)
         best_box_classes = tf.where(best_ious > self.iou_match_thresh, best_box_classes, tf.ones_like(best_box_classes)*-1)
         correspond_regression = EfficientDetAnchors._regression_from_boxes(default_boxes, best_boxes)
-        return best_box_classes, correspond_regression
+        return best_box_classes[None], correspond_regression[None]
 
     @staticmethod
     def _regression_from_boxes(default_boxes, target_boxes):
@@ -203,8 +226,9 @@ class EfficientDetAnchors:
 
     @staticmethod
     def _default_absolute_centroids(level, height, width):
+        stride = EfficientDetAnchors._level_to_stride(level)
         pixel_coords = EfficientDetAnchors._get_pixel_coords(height, width)
-        return pixel_coords*EfficientDetAnchors._level_to_stride(level)
+        return pixel_coords*stride + stride//2
 
     def _default_width_height(self, level):
         stride = EfficientDetAnchors._level_to_stride(level)
@@ -245,3 +269,4 @@ class EfficientDetAnchors:
 
     def num_boxes(self):
         return tf.shape(self.aspects)[0]
+tf.keras.layers.MaxPool1D()
