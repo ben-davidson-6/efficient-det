@@ -3,6 +3,7 @@ import tensorflow as tf
 import numpy as np
 
 from efficient_det.model.anchor import EfficientDetAnchors, Boxes
+from efficient_det.datasets.coco import Coco
 
 
 def test_row_col_grid():
@@ -104,4 +105,39 @@ def test_box_to_regression_and_back():
     tf.debugging.assert_near(regressions[0, 1, 1, 0], tf.constant(expected_regression))
     box_from_regree = anchors._regress_to_absolute_tlbr(level, regressions)[0, 1, 1, 0]
     tf.debugging.assert_near(tf.cast(box, tf.float32), box_from_regree)
+
+
+@pytest.mark.skip(reason='visual confirmation')
+def test_visual_example():
+    import matplotlib.pyplot as plt
+    val_ds = Coco.raw_dataset(Coco.validation)
+    anchors = EfficientDetAnchors(
+        size=4,
+        aspects=[(1, 1.), (0.7, 1.4), (1.4, 0.7)],
+        num_levels=3,
+        iou_match_thresh=0.4)
+    for example in val_ds:
+        height, width = example['image'].shape[:2]
+        gt_boxes = Boxes(height, width, example['objects']['bbox'], example['objects']['label'])
+        gt_boxes.unnormalise()
+
+        colors = np.array([[1.0, 0.0, 0.0], [0.0, 0.0, 1.0]])
+        image = tf.image.convert_image_dtype(example['image'][None], tf.float32)
+        original_boxes = example['objects']['bbox'][None]
+        original_bounding_image = tf.image.draw_bounding_boxes(
+            image,
+            original_boxes,
+            colors,
+        )[0]
+
+        absos = anchors.calculate_and_return_absolute_tlbr_boxes(gt_boxes)
+        absos /= tf.constant([height, width, height, width], dtype=tf.float32)[None]
+        anchor_bbox_image = tf.image.draw_bounding_boxes(
+            image,
+            absos[None],
+            colors,
+        )[0]
+        plt.imshow(np.vstack((original_bounding_image, anchor_bbox_image)))
+        plt.show()
+        break
 

@@ -1,4 +1,5 @@
 import tensorflow as tf
+import efficient_det
 
 
 class Boxes:
@@ -171,7 +172,7 @@ class EfficientDetAnchors:
         tlbr_boxes = []
         for level, (label, regression) in enumerate(self.absolute_to_regression(gt_boxes)):
             boxes = self._regress_to_absolute_tlbr(level, regression)
-            out = tf.boolean_mask(boxes, label != -1)
+            out = tf.boolean_mask(boxes, label != efficient_det.NO_CLASS_LABEL)
             tlbr_boxes.append(out)
         return tf.concat(tlbr_boxes, axis=0)
 
@@ -207,7 +208,10 @@ class EfficientDetAnchors:
         """
         default_boxes = self._default_boxes_for_absolute(level, boxes)
         best_box_classes, best_ious, best_boxes = boxes.match_with_anchor(default_boxes)
-        best_box_classes = tf.where(best_ious > self.iou_match_thresh, best_box_classes, tf.ones_like(best_box_classes)*-1)
+        best_box_classes = tf.where(
+            best_ious > self.iou_match_thresh,
+            best_box_classes,
+            tf.ones_like(best_box_classes)*efficient_det.NO_CLASS_LABEL)
         correspond_regression = EfficientDetAnchors._regression_from_boxes(default_boxes, best_boxes)
         return best_box_classes[None], correspond_regression[None]
 

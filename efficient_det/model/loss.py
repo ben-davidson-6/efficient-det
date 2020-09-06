@@ -1,5 +1,8 @@
 import tensorflow as tf
 
+# todo need to make use of the sample weight, can probably replace the normalisation
+#   mixin with this as well
+
 
 class EfficientDetLoss(tf.keras.losses.Loss):
     def __init__(self, focal_loss, box_loss, weights):
