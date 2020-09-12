@@ -1,1 +1,2 @@
 NO_CLASS_LABEL = -1
+SEED = 1

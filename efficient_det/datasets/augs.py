@@ -1,24 +1,28 @@
 import tensorflow as tf
 import efficient_det.model.anchor
+import efficient_det
 
 
 class ImageBasicPreparation:
-    def __int__(self, min_scale, max_scale, target_shape):
+    # todo how to deal with the case where no box is returned?
+
+    def __init__(self, min_scale, max_scale, target_shape):
         self.min_scale = min_scale
         self.max_scale = max_scale
         self.target_shape = target_shape
 
     def scale_and_random_crop(self, image, bbox, labels):
-        image = self._random_scale_image(image)
+        image, bbox = self._random_scale_image(image, bbox)
         image, bbox = self._pad_to_target_if_needed(image, bbox)
         image, bbox, labels = self._random_crop(image, bbox, labels)
         return image, bbox, labels
 
-    def _random_scale_image(self, image):
-        scale = tf.random.uniform(self.min_scale, self.max_scale)
-        scaled_shape = tf.cast(scale*ImageBasicPreparation._image_hw(image), tf.int32)
-        scaled_image_dims = tf.concat([scaled_shape, tf.shape(image)[-1:]])
-        return tf.image.resize(image, scaled_image_dims)
+    def _random_scale_image(self, image, bbox):
+        scale = tf.random.uniform([], self.min_scale, self.max_scale)
+        image_hw = ImageBasicPreparation._image_hw(image)
+        scaled_shape = tf.cast(scale*tf.cast(image_hw, tf.float32), tf.int32)
+        bbox = tf.cast(tf.cast(bbox, tf.float32)*scale, tf.int32)
+        return tf.image.resize(image, scaled_shape), bbox
 
     def _random_crop(self, image, bboxes, labels):
         tlbr = self._crop_tlbr_box(image)
@@ -32,15 +36,23 @@ class ImageBasicPreparation:
 
     @staticmethod
     def _crop_bboxes(bboxes, labels, tlbr):
-        reduced_boxes = ImageBasicPreparation.intersection(tlbr, bboxes)
-        valid_boxes = efficient_det.model.anchor.Boxes.box_area(reduced_boxes) > 0.
-        return reduced_boxes[valid_boxes], labels[valid_boxes]
+        reduced_boxes = efficient_det.model.anchor.Boxes.intersecting_boxes(tlbr[None], bboxes)[0]
+        valid_boxes = efficient_det.model.anchor.Boxes.box_area(reduced_boxes) > 0
+
+        offset = tlbr[:2]
+        reduced_boxes -= tf.concat([offset, offset], axis=0)[None]
+
+        reduced_boxes = tf.boolean_mask(reduced_boxes, valid_boxes)
+        reduced_labels = tf.boolean_mask(labels, valid_boxes)
+        return reduced_boxes, reduced_labels
 
     def _crop_tlbr_box(self, image):
         image_dims = ImageBasicPreparation._image_hw(image)
-        can_choose = image_dims - self.target_shape
-        tl = tf.random.uniform([2], minval=tf.zeros([2]), maxval=can_choose + 1, dtype=tf.int32)
-        return tf.concat([tl, tl + self.target_shape])
+        can_choose = image_dims - self.target_shape + 1
+        top = tf.random.uniform([1], minval=0, maxval=can_choose[0], dtype=tf.int32)
+        left = tf.random.uniform([1], minval=0, maxval=can_choose[1], dtype=tf.int32)
+        tl = tf.concat([top, left], axis=0)
+        return tf.concat([tl, tl + self.target_shape], axis=0)
 
     def _pad_to_target_if_needed(self, image, bbox):
         to_pad, bbox_offset = self._calc_padding(image)
@@ -55,7 +67,7 @@ class ImageBasicPreparation:
         to_pad_0 = to_pad // 2
         to_pad_1 = to_pad - to_pad_0
 
-        bbox_offset = tf.concat([to_pad_0[:2], to_pad_0[:2]])
+        bbox_offset = tf.concat([to_pad_0[:2], to_pad_0[:2]], axis=0)
         to_pad = tf.stack([to_pad_0, to_pad_1], axis=-1)
         return to_pad, bbox_offset[None]
 
@@ -63,13 +75,5 @@ class ImageBasicPreparation:
     def _image_hw(image):
         return tf.shape(image)[:2]
 
-    @staticmethod
-    def intersection(image_box, gt_boxes):
-        xmin = tf.maximum(image_box[None], gt_boxes)
-        ymin = tf.maximum(image_box[None], gt_boxes)
-        xmax = tf.minimum(image_box[None], gt_boxes)
-        ymax = tf.minimum(image_box[None], gt_boxes)
-        intersecting_boxes = tf.stack([ymin, xmin, ymax, xmax], axis=-1)[0]
-        return intersecting_boxes
 
 

@@ -21,10 +21,17 @@ class Boxes:
         self.image_width = image_width
 
     def unnormalise(self):
-        unnormalisation = tf.constant(
+        unnormalisation = self._normalisation_tensor()
+        self.box_tensor *= unnormalisation
+
+    def normalise(self,):
+        normalisation = self._normalisation_tensor()
+        self.box_tensor = tf.cast(self.box_tensor, tf.float32)/normalisation
+
+    def _normalisation_tensor(self):
+        return tf.constant(
             [[self.image_height, self.image_width, self.image_height, self.image_width]],
             dtype=tf.float32)
-        self.box_tensor *= unnormalisation
 
     def get_image_dimensions(self):
         return self.image_width, self.image_height
@@ -65,16 +72,8 @@ class Boxes:
         anchor_h, anchor_w, n_anchors = anchor_original_shape[0], anchor_original_shape[1], anchor_original_shape[2]
         anchor_boxes = tf.reshape(anchor_boxes_original, [-1, 4])
 
-        box_ymin, box_xmin, box_ymax, box_xmax = Boxes.get_box_components(self.box_tensor)
-        anc_ymin, anc_xmin, anc_ymax, anc_xmax = Boxes.get_box_components(anchor_boxes)
-
-        # determine the (x, y)-coordinates of the intersection rectangle
-        xmin = tf.maximum(box_xmin[:, None], anc_xmin[None, :])
-        ymin = tf.maximum(box_ymin[:, None], anc_ymin[None, :])
-        xmax = tf.minimum(box_xmax[:, None], anc_xmax[None, :])
-        ymax = tf.minimum(box_ymax[:, None], anc_ymax[None, :])
-        intersecting_boxes = tf.stack([ymin, xmin, ymax, xmax], axis=-1)
-
+        # intersect boxes and get area
+        intersecting_boxes = Boxes.intersecting_boxes(self.box_tensor, anchor_boxes)
         inter_area = Boxes.box_area(intersecting_boxes)
         box_area = Boxes.box_area(self.box_tensor)
         anchor_area = Boxes.box_area(anchor_boxes)
@@ -94,6 +93,19 @@ class Boxes:
     @staticmethod
     def get_box_components(box):
         return [x[..., 0] for x in tf.split(box, num_or_size_splits=4, axis=-1, )]
+
+    @staticmethod
+    def intersecting_boxes(box_a, box_b):
+        box_a_ymin, box_a_xmin, box_a_ymax, box_a_xmax = Boxes.get_box_components(box_a)
+        box_b_ymin, box_b_xmin, box_b_ymax, box_b_xmax = Boxes.get_box_components(box_b)
+
+        # determine the (x, y)-coordinates of the intersection rectangle
+        xmin = tf.maximum(box_a_xmin[:, None], box_b_xmin[None, :])
+        ymin = tf.maximum(box_a_ymin[:, None], box_b_ymin[None, :])
+        xmax = tf.minimum(box_a_xmax[:, None], box_b_xmax[None, :])
+        ymax = tf.minimum(box_a_ymax[:, None], box_b_ymax[None, :])
+        intersecting_boxes = tf.stack([ymin, xmin, ymax, xmax], axis=-1)
+        return intersecting_boxes
 
     @staticmethod
     def box_area(boxes):
