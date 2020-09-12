@@ -101,6 +101,9 @@ class Boxes:
         return tf.maximum((xmax - xmin), 0) * tf.maximum((ymax - ymin), 0)
 
 
+# todo need to add octaves I think, scales dont capture all atm
+#   could also add a final lyaer in the net
+
 class EfficientDetAnchors:
 
     def __init__(self, size, aspects, num_levels, iou_match_thresh=None):
