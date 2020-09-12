@@ -6,7 +6,7 @@ class Boxes:
     def __init__(self, image_height, image_width, box_tensor, classes):
         """
         the box tensor should be of the form [nboxes, ymin, xmin, ymax, xmax]
-        in unnormalised form!
+        in normal or unormal doesnt matter, except for area!
 
         Parameters
         ----------
@@ -23,10 +23,12 @@ class Boxes:
     def unnormalise(self):
         unnormalisation = self._normalisation_tensor()
         self.box_tensor *= unnormalisation
+        return self.box_tensor
 
     def normalise(self,):
         normalisation = self._normalisation_tensor()
         self.box_tensor = tf.cast(self.box_tensor, tf.float32)/normalisation
+        return self.box_tensor
 
     def _normalisation_tensor(self):
         return tf.constant(
@@ -111,6 +113,26 @@ class Boxes:
     def box_area(boxes):
         ymin, xmin, ymax, xmax = Boxes.get_box_components(boxes)
         return tf.maximum((xmax - xmin), 0) * tf.maximum((ymax - ymin), 0)
+
+    @staticmethod
+    def from_image_and_boxes(image, bboxes):
+        image_shape = tf.shape(image)
+        bbox = efficient_det.model.anchor.Boxes(
+            image_height=image_shape[0],
+            image_width=image_shape[1],
+            box_tensor=bboxes,
+            classes=None)
+        return bbox
+
+    @staticmethod
+    def from_image_boxes_labels(image, bboxes, labels):
+        image_shape = tf.shape(image)
+        bbox = efficient_det.model.anchor.Boxes(
+            image_height=image_shape[0],
+            image_width=image_shape[1],
+            box_tensor=bboxes,
+            classes=labels)
+        return bbox
 
 
 # todo need to add octaves I think, scales dont capture all atm

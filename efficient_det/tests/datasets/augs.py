@@ -1,6 +1,7 @@
 import pytest
 import tensorflow as tf
 import efficient_det.datasets.augs as augs
+import efficient_det.datasets.train_data_prep
 import efficient_det.model.anchor as anchor
 import random
 import matplotlib.pyplot as plt
@@ -24,8 +25,8 @@ def single_example():
 
 
 def test_does_nothing(single_example):
-    prepper = augs.ImageBasicPreparation(min_scale=1, max_scale=1, target_shape=64)
-    image, bboxes, labels = prepper.scale_and_random_crop(*single_example)
+    prepper = efficient_det.datasets.train_data_prep.ImageBasicPreparation(min_scale=1, max_scale=1, target_shape=64)
+    image, bboxes, labels = prepper.scale_and_random_crop_unnormalised(*single_example)
     assert labels.shape == single_example[2].shape
     assert bboxes.shape == single_example[1].shape
     assert image.shape == single_example[0].shape
@@ -34,7 +35,7 @@ def test_does_nothing(single_example):
 def test_scale_image(single_example):
     image, bbox, labels = single_example
     scale = 0.7
-    prepper = augs.ImageBasicPreparation(min_scale=scale, max_scale=scale, target_shape=64)
+    prepper = efficient_det.datasets.train_data_prep.ImageBasicPreparation(min_scale=scale, max_scale=scale, target_shape=64)
     image_mod, bboxes_mod = prepper._random_scale_image(image, bbox)
     tf.debugging.assert_equal(bboxes_mod[0], tf.cast(tf.constant([0., 0., scale*64, scale*64]), tf.int32))
 
@@ -90,8 +91,8 @@ def test_looks_right(random_example_in_image, box_plotter):
     image, bboxes, labels, colors = random_example_in_image
 
     for _ in range(5):
-        prepper = augs.ImageBasicPreparation(min_scale=0.5, max_scale=2., target_shape=512)
-        image_mod, bboxes_mod, labels_mod = prepper.scale_and_random_crop(image, bboxes, labels)
+        prepper = efficient_det.datasets.train_data_prep.ImageBasicPreparation(min_scale=0.5, max_scale=2., target_shape=512)
+        image_mod, bboxes_mod, labels_mod = prepper.scale_and_random_crop_unnormalised(image, bboxes, labels)
         box_plotter(image, image_mod, bboxes, bboxes_mod, colors, title='random example')
 
 
@@ -100,17 +101,17 @@ def test_scaling_looks_right(random_example_in_image, box_plotter):
     image, bboxes, labels, colors = random_example_in_image
 
     # no scale
-    prepper = augs.ImageBasicPreparation(min_scale=1, max_scale=1, target_shape=64)
+    prepper = efficient_det.datasets.train_data_prep.ImageBasicPreparation(min_scale=1, max_scale=1, target_shape=64)
     image_mod, bboxes_mod = prepper._random_scale_image(image, bboxes)
     box_plotter(image, image_mod, bboxes, bboxes_mod, colors, 'no scaling')
 
     # up scale
-    prepper = augs.ImageBasicPreparation(min_scale=2., max_scale=2., target_shape=64)
+    prepper = efficient_det.datasets.train_data_prep.ImageBasicPreparation(min_scale=2., max_scale=2., target_shape=64)
     image_mod, bboxes_mod = prepper._random_scale_image(image, bboxes)
     box_plotter(image, image_mod, bboxes, bboxes_mod, colors, 'up scaling')
 
     # down scale
-    prepper = augs.ImageBasicPreparation(min_scale=0.5, max_scale=0.5, target_shape=64)
+    prepper = efficient_det.datasets.train_data_prep.ImageBasicPreparation(min_scale=0.5, max_scale=0.5, target_shape=64)
     image_mod, bboxes_mod = prepper._random_scale_image(image, bboxes)
     box_plotter(image, image_mod, bboxes, bboxes_mod, colors, 'down scaling')
 
@@ -122,22 +123,22 @@ def test_pad_to_looks_right(random_example_in_image, box_plotter):
     max_dim = max(h, w)
 
     # single dim
-    prepper = augs.ImageBasicPreparation(min_scale=1, max_scale=1, target_shape=min_dim + 100)
+    prepper = efficient_det.datasets.train_data_prep.ImageBasicPreparation(min_scale=1, max_scale=1, target_shape=min_dim + 100)
     image_mod, bboxes_mod = prepper._pad_to_target_if_needed(image, bboxes)
     box_plotter(image, image_mod, bboxes, bboxes_mod, colors, 'with padding single dim')
 
     # both dim
-    prepper = augs.ImageBasicPreparation(min_scale=1, max_scale=1, target_shape=max_dim + 100)
+    prepper = efficient_det.datasets.train_data_prep.ImageBasicPreparation(min_scale=1, max_scale=1, target_shape=max_dim + 100)
     image_mod, bboxes_mod = prepper._pad_to_target_if_needed(image, bboxes)
     box_plotter(image, image_mod, bboxes, bboxes_mod, colors, 'with padding both dim')
 
     # 0 padding
-    prepper = augs.ImageBasicPreparation(min_scale=2., max_scale=2., target_shape=min_dim)
+    prepper = efficient_det.datasets.train_data_prep.ImageBasicPreparation(min_scale=2., max_scale=2., target_shape=min_dim)
     image_mod, bboxes_mod = prepper._pad_to_target_if_needed(image, bboxes)
     box_plotter(image, image_mod, bboxes, bboxes_mod, colors, 'zero padding')
 
     # ngative
-    prepper = augs.ImageBasicPreparation(min_scale=0.5, max_scale=0.5, target_shape=64)
+    prepper = efficient_det.datasets.train_data_prep.ImageBasicPreparation(min_scale=0.5, max_scale=0.5, target_shape=64)
     image_mod, bboxes_mod = prepper._pad_to_target_if_needed(image, bboxes)
     box_plotter(image, image_mod, bboxes, bboxes_mod, colors, 'negative?')
 
@@ -150,7 +151,7 @@ def test_crop_looks_right(random_example_in_image, box_plotter, mocker):
     max_dim = max(h, w)
 
     # single dim
-    prepper = augs.ImageBasicPreparation(min_scale=1, max_scale=1, target_shape=min_dim)
+    prepper = efficient_det.datasets.train_data_prep.ImageBasicPreparation(min_scale=1, max_scale=1, target_shape=min_dim)
     image_mod, bboxes_mod, labels = prepper._random_crop(image, bboxes, labels)
     box_plotter(image, image_mod, bboxes, bboxes_mod, colors, 'with padding single dim')
 
