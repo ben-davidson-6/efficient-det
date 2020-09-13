@@ -16,9 +16,6 @@ def unnormalise(f):
 
 
 class ImageBasicPreparation:
-    # todo how to deal with the case where no box is returned?
-    #   actually this needs to be dealt with in the anchors as we will just have no
-    #   nothing to assign there
 
     def __init__(self, min_scale, max_scale, target_shape):
         self.min_scale = min_scale

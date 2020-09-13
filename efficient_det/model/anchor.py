@@ -3,13 +3,6 @@ import efficient_det
 from efficient_det.common.box import Boxes
 
 
-# todo need to add octaves I think, scales dont capture all atm
-#   could also add a final lyaer in the net
-#   there are some shape weirdness
-
-# todo I think maybe a regression class?
-
-
 class EfficientDetAnchors:
 
     def __init__(self, size, aspects, num_levels, iou_match_thresh=None):
@@ -191,7 +184,6 @@ class EfficientDetAnchors:
     def _default_boxes_for_absolute(self, level, boxes):
         image_width, image_height = boxes.get_image_dimensions()
         stride = EfficientDetAnchors._level_to_stride(level)
-        # todo this may cause some issues
         regress_height, regress_width = image_height//stride, image_width//stride
         return self._default_box_tensor(level, regress_height, regress_width)
 

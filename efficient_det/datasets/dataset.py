@@ -10,7 +10,6 @@ class Dataset:
     validation = 'validation'
     train = 'train'
 
-    # todo tune the maps, DEAL WITH NO LABELS!!!
     def __init__(
             self,
             anchors: EfficientDetAnchors,
@@ -20,7 +19,6 @@ class Dataset:
         self.basic_training_prep = basic_training_prep
         self.batch_size = batch_size
         self.anchors = anchors
-        # todo
         self.augmentations = lambda x, y: (x, y) if augmentations is None else augmentations
 
     def training_set(self):
