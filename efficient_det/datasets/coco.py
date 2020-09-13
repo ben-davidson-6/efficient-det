@@ -8,14 +8,12 @@ NAME = 'coco/2017'
 
 class Coco(efficient_det.datasets.dataset.Dataset):
 
-    @staticmethod
-    def _raw_training_set():
+    def _raw_training_set(self,):
         ds = Coco.raw_dataset(Coco.validation)
         ds = ds.map(Coco.get_image_box_label)
         return ds
 
-    @staticmethod
-    def _raw_validation_set():
+    def _raw_validation_set(self,):
         ds = Coco.raw_dataset(Coco.validation)
         ds = ds.map(Coco.get_image_box_label)
         return ds

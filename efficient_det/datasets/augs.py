@@ -2,7 +2,7 @@ import tensorflow as tf
 
 
 class Augmenter:
-    pass
-
+    def __call__(self, *args):
+        return args
 
 

@@ -1,17 +1,17 @@
 import tensorflow as tf
 
+import efficient_det.common.box
 import efficient_det.model
 
 
-def unnormalise_and_back(f):
+def unnormalise(f):
     def deco(self, image, bbox, labels):
-        bbox = efficient_det.model.anchor.Boxes.from_image_and_boxes(image, bbox)
-        bbox_unnormalised = bbox.unnormalise()
+        bbox = efficient_det.common.box.Boxes.from_image_and_boxes(image, bbox)
+        bbox.unnormalise()
 
-        image, bbox_unnormalised, labels = f(self, image, bbox_unnormalised, labels)
+        image, bbox_unnormalised, labels = f(self, image, bbox.box_tensor, labels)
 
-        bbox = efficient_det.model.anchor.Boxes.from_image_and_boxes(image, bbox_unnormalised)
-        return bbox.normalised()
+        return image, bbox_unnormalised, labels
     return deco
 
 
@@ -25,7 +25,7 @@ class ImageBasicPreparation:
         self.max_scale = max_scale
         self.target_shape = target_shape
 
-    @unnormalise_and_back
+    @unnormalise
     def scale_and_random_crop_normalised(self, image, bbox, labels):
         return self.scale_and_random_crop_unnormalised(image, bbox, labels)
 
@@ -55,8 +55,8 @@ class ImageBasicPreparation:
 
     @staticmethod
     def _crop_bboxes(bboxes, labels, tlbr):
-        reduced_boxes = efficient_det.model.anchor.Boxes.intersecting_boxes(tlbr[None], bboxes)[0]
-        valid_boxes = efficient_det.model.anchor.Boxes.box_area(reduced_boxes) > 0
+        reduced_boxes = efficient_det.common.box.Boxes.intersecting_boxes(tlbr[None], bboxes)[0]
+        valid_boxes = efficient_det.common.box.Boxes.box_area(reduced_boxes) > 0
 
         offset = tlbr[:2]
         reduced_boxes -= tf.concat([offset, offset], axis=0)[None]

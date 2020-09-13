@@ -1,142 +1,14 @@
 import tensorflow as tf
 import efficient_det
-
-
-class Boxes:
-    def __init__(self, image_height, image_width, box_tensor, classes):
-        """
-        the box tensor should be of the form [nboxes, ymin, xmin, ymax, xmax]
-        in normal or unormal doesnt matter, except for area!
-
-        Parameters
-        ----------
-        image_height
-        image_width
-        box_tensor
-        classes : [nboxes] tensor no class should have the label -1!!
-        """
-        self.classes = classes
-        self.box_tensor = box_tensor
-        self.image_height = image_height
-        self.image_width = image_width
-
-    def unnormalise(self):
-        unnormalisation = self._normalisation_tensor()
-        self.box_tensor *= unnormalisation
-        return self.box_tensor
-
-    def normalise(self,):
-        normalisation = self._normalisation_tensor()
-        self.box_tensor = tf.cast(self.box_tensor, tf.float32)/normalisation
-        return self.box_tensor
-
-    def _normalisation_tensor(self):
-        return tf.constant(
-            [[self.image_height, self.image_width, self.image_height, self.image_width]],
-            dtype=tf.float32)
-
-    def get_image_dimensions(self):
-        return self.image_width, self.image_height
-
-    def boxes_as_centroid_and_widths(self):
-        centroid_x = (self.box_tensor[:, 1] + self.box_tensor[:, 3])/2
-        centroid_y = (self.box_tensor[:, 0] + self.box_tensor[:, 2])/2
-        sx = (self.box_tensor[:, 3] - self.box_tensor[:, 1])/2
-        sy = (self.box_tensor[:, 2] - self.box_tensor[:, 0])/2
-        return tf.stack([centroid_x, centroid_y, sx, sy], axis=-1)
-
-    @staticmethod
-    def absolute_as_tlbr(anchor_boxes):
-        cx, cy, sx, sy = tf.split(anchor_boxes, num_or_size_splits=4, axis=-1)
-        ymin = cy - sy
-        ymax = cy + sy
-        xmin = cx - sx
-        xmax = cx + sx
-        return tf.concat([ymin, xmin, ymax, xmax], axis=-1)
-
-    def match_with_anchor(self, anchor_boxes):
-        """
-        taken from https://github.com/venuktan/Intersection-Over-Union/blob/master/iou_benchmark.py
-
-        Parameters
-        ----------
-        anchor_boxes : tensor of shape [h, w, nanchors, 4]
-            represents [cx, cy, sx, sy]
-
-        Returns
-        -------
-        ious : tensor of shape [..., nboxes]
-            the iou for each box
-
-        """
-        anchor_boxes_original = Boxes.absolute_as_tlbr(anchor_boxes)
-        anchor_original_shape = tf.shape(anchor_boxes_original)
-        anchor_h, anchor_w, n_anchors = anchor_original_shape[0], anchor_original_shape[1], anchor_original_shape[2]
-        anchor_boxes = tf.reshape(anchor_boxes_original, [-1, 4])
-
-        # intersect boxes and get area
-        intersecting_boxes = Boxes.intersecting_boxes(self.box_tensor, anchor_boxes)
-        inter_area = Boxes.box_area(intersecting_boxes)
-        box_area = Boxes.box_area(self.box_tensor)
-        anchor_area = Boxes.box_area(anchor_boxes)
-        combo_area = box_area[:, None] + anchor_area[None, :]
-
-        # [nboxes, h*w*nanchors]
-        iou = inter_area / (combo_area - inter_area)
-        iou = tf.reshape(iou, [-1, anchor_h, anchor_w, n_anchors])
-        best_box = tf.argmax(iou, axis=0)
-
-        best_box_class = tf.gather(self.classes, best_box)
-        best_iou = tf.reduce_max(iou, axis=0)
-        best_boxes = tf.gather(self.boxes_as_centroid_and_widths(), best_box)
-
-        return best_box_class, best_iou, best_boxes
-
-    @staticmethod
-    def get_box_components(box):
-        return [x[..., 0] for x in tf.split(box, num_or_size_splits=4, axis=-1, )]
-
-    @staticmethod
-    def intersecting_boxes(box_a, box_b):
-        box_a_ymin, box_a_xmin, box_a_ymax, box_a_xmax = Boxes.get_box_components(box_a)
-        box_b_ymin, box_b_xmin, box_b_ymax, box_b_xmax = Boxes.get_box_components(box_b)
-
-        # determine the (x, y)-coordinates of the intersection rectangle
-        xmin = tf.maximum(box_a_xmin[:, None], box_b_xmin[None, :])
-        ymin = tf.maximum(box_a_ymin[:, None], box_b_ymin[None, :])
-        xmax = tf.minimum(box_a_xmax[:, None], box_b_xmax[None, :])
-        ymax = tf.minimum(box_a_ymax[:, None], box_b_ymax[None, :])
-        intersecting_boxes = tf.stack([ymin, xmin, ymax, xmax], axis=-1)
-        return intersecting_boxes
-
-    @staticmethod
-    def box_area(boxes):
-        ymin, xmin, ymax, xmax = Boxes.get_box_components(boxes)
-        return tf.maximum((xmax - xmin), 0) * tf.maximum((ymax - ymin), 0)
-
-    @staticmethod
-    def from_image_and_boxes(image, bboxes):
-        image_shape = tf.shape(image)
-        bbox = efficient_det.model.anchor.Boxes(
-            image_height=image_shape[0],
-            image_width=image_shape[1],
-            box_tensor=bboxes,
-            classes=None)
-        return bbox
-
-    @staticmethod
-    def from_image_boxes_labels(image, bboxes, labels):
-        image_shape = tf.shape(image)
-        bbox = efficient_det.model.anchor.Boxes(
-            image_height=image_shape[0],
-            image_width=image_shape[1],
-            box_tensor=bboxes,
-            classes=labels)
-        return bbox
+from efficient_det.common.box import Boxes
 
 
 # todo need to add octaves I think, scales dont capture all atm
 #   could also add a final lyaer in the net
+#   there are some shape weirdness
+
+# todo I think maybe a regression class?
+
 
 class EfficientDetAnchors:
 
@@ -189,7 +61,7 @@ class EfficientDetAnchors:
         in the training loop we can just read the tensors
         Parameters
         ----------
-        boxes : Boxes
+        boxes : efficient_det.common.box.Boxes
             contains tensor/array [nboxes, ymin, xmin, ymax, xmax]
             bounding boxes for a single image and integer
             tensor/array [nboxes] the class of each box
@@ -205,13 +77,29 @@ class EfficientDetAnchors:
         for level in range(self.num_levels):
             yield self._assign_boxes_to_level(boxes, level)
 
-    def calculate_and_return_absolute_tlbr_boxes(self, gt_boxes):
+    def regressions_to_tlbr(self, regressions):
+        """
+
+        Parameters
+        ----------
+        regressions : generator of tuples (regression, regression_label) for a single image
+
+        Returns
+        -------
+
+        box tensor : [n, 4] in tlbr format
+        label tensor : [n]
+
+        """
         tlbr_boxes = []
-        for level, (label, regression) in enumerate(self.absolute_to_regression(gt_boxes)):
+        labels = []
+        for level, (regression_label, regression) in enumerate(regressions):
             boxes = self._regress_to_absolute_tlbr(level, regression)
-            out = tf.boolean_mask(boxes, label != efficient_det.NO_CLASS_LABEL)
-            tlbr_boxes.append(out)
-        return tf.concat(tlbr_boxes, axis=0)
+            boxes_out = tf.boolean_mask(boxes, regression_label != efficient_det.NO_CLASS_LABEL)
+            labels_out = tf.boolean_mask(regression_label, regression_label != efficient_det.NO_CLASS_LABEL)
+            tlbr_boxes.append(boxes_out)
+            labels.append(labels_out)
+        return tf.concat(tlbr_boxes, axis=0), tf.concat(labels, axis=0)
 
     def _regress_to_absolute_individual_level(self, level, regression):
         default_boxes = self._default_boxes_for_regression(level, regression)
@@ -250,7 +138,7 @@ class EfficientDetAnchors:
             best_box_classes,
             tf.ones_like(best_box_classes)*efficient_det.NO_CLASS_LABEL)
         correspond_regression = EfficientDetAnchors._regression_from_boxes(default_boxes, best_boxes)
-        return best_box_classes[None], correspond_regression[None]
+        return best_box_classes, correspond_regression
 
     @staticmethod
     def _regression_from_boxes(default_boxes, target_boxes):
@@ -296,9 +184,8 @@ class EfficientDetAnchors:
         return tf.stack(tf.meshgrid(xs, ys), axis=-1)
 
     def _default_boxes_for_regression(self, level, regression):
-        regressed_shape = tf.shape(regression)
-        default_boxes = self._default_box_tensor(level, regressed_shape[1], regressed_shape[2])
-        default_boxes = tf.expand_dims(default_boxes, axis=0)
+        h, w = EfficientDetAnchors._regression_height_width(regression)
+        default_boxes = self._default_box_tensor(level, h, w)
         return default_boxes
 
     def _default_boxes_for_absolute(self, level, boxes):
@@ -310,4 +197,11 @@ class EfficientDetAnchors:
 
     def num_boxes(self):
         return tf.shape(self.aspects)[0]
-tf.keras.layers.MaxPool1D()
+
+    @staticmethod
+    def _regression_height_width(regression):
+        shape = tf.shape(regression)
+        if tf.rank(regression) == 5:
+            return shape[1], shape[2]
+        else:
+            return shape[0], shape[1]
