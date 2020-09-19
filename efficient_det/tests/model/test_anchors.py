@@ -134,7 +134,7 @@ def test_from_raw_to_regression_and_back_visual(plt):
     plt.suptitle(
         'plotting raw from dataset, and then converting to a\n'
         'regression and back, should both look the same')
-
+    plt.saveas = f"{plt.saveas[:-4]}.png"
 
 def test_empty_boxes():
     image = tf.random.uniform([64, 64, 3])

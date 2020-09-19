@@ -7,6 +7,7 @@ class EfficientDetAnchors:
 
     def __init__(self, size, aspects, num_levels, iou_match_thresh=None):
         self.size = size
+        self.num_anchors = len(aspects)
         self.aspects = tf.constant(aspects)
         self.num_levels = num_levels
         self.iou_match_thresh = iou_match_thresh
@@ -30,11 +31,13 @@ class EfficientDetAnchors:
         output : yield array of shape [batch_size, h_i, w_i, n, 4]
             (cx, cy, w/2, h/2) center x, y and widht and height in pixels
         """
+        out = []
         for level, regression in enumerate(regressions):
             # add fake batch
             if regression.ndim == 4:
                 regression = tf.expand_dims(regression, axis=0)
-            yield self._regress_to_absolute_individual_level(level, regression)
+            out.append(self._regress_to_absolute_individual_level(level, regression))
+        return out
 
     def absolute_to_regression(self, boxes):
         """
@@ -67,8 +70,10 @@ class EfficientDetAnchors:
             from the default boxes as well as [h_i, w_i, n] indication the classes
             with nan being a negative
         """
+        out = ()
         for level in range(self.num_levels):
-            yield self._build_boxes_for_level(boxes, level)
+            out += (self._build_boxes_for_level(boxes, level),)
+        return out
 
     def regressions_to_tlbr(self, regressions):
         """
@@ -199,7 +204,7 @@ class EfficientDetAnchors:
         return self._default_box_tensor(level, regress_height, regress_width)
 
     def num_boxes(self):
-        return tf.shape(self.aspects)[0]
+        return self.num_anchors
 
     @staticmethod
     def _regression_height_width(regression):

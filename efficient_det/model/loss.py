@@ -51,7 +51,7 @@ class SampleWeightCalculator:
 
     def update_classes(self, negatives, y_true):
         """NO_CLASS_LABEL is -1 and we have the sample weight to ignore all others"""
-        tf.where(negatives, self.n_classes + 1, y_true)
+        tf.where(negatives, self.n_classes + 1, tf.cast(y_true, tf.int32))
         return y_true
 
     @staticmethod
@@ -86,11 +86,11 @@ class EfficientDetLoss(tf.keras.losses.Loss):
         -------
 
         """
-        y_true_class, y_true_regression = y_true
-        y_pred_class, y_pred_regression = y_pred
+        y_true_class, y_true_regression = y_true[0], y_true[1]
+        y_pred_class, y_pred_regression = y_pred[0], y_pred[1]
         y_pred_class = tf.nn.sigmoid(y_pred_class)
-
         sample_weight, y_true_class = self.sample_weight_calculator.mask_and_update_class(y_true_class, y_pred_class)
+        print(y_true_class)
         fl = self.focal_loss(y_true_class, y_pred_class, sample_weight) * self.weights[0]
         bl = self.box_loss(y_true_regression, y_pred_regression, sample_weight) * self.weights[1]
         return fl + bl

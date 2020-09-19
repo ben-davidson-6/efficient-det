@@ -37,7 +37,7 @@ class Dataset:
 
     def _build_regressions(self, image, bboxes, labels):
         bboxes = Boxes.from_image_boxes_labels(image, bboxes, labels)
-        regressions = tuple(self.anchors.absolute_to_regression(bboxes))
+        regressions = self.anchors.absolute_to_regression(bboxes)
         return image, regressions
 
     def _raw_validation_set(self,):

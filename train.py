@@ -26,7 +26,7 @@ anchors = model.EfficientDetAnchors(
 # todo add downsampling layer
 phi = 0
 num_classes = 80
-network = model.EfficientDetNetwork(phi, num_classes, anchors.num_boxes())
+efficient_det = model.EfficientDetNetwork(phi, num_classes, anchors.num_boxes())
 
 # loss
 loss_weights = tf.constant([0.5, 0.5])
@@ -42,13 +42,20 @@ loss = model.EfficientDetLoss(class_loss, box_loss, loss_weights, num_classes, s
 # dataset
 # todo add augmentations
 #      tune the maps,
-#      DEAL WITH NO LABELS!!!
-
 prepper = train_data_prep.ImageBasicPreparation(min_scale=0.1, max_scale=1.5, target_shape=128)
 dataset = coco.Coco(
     anchors=anchors,
     augmentations=None,
     basic_training_prep=prepper,
-    batch_size=2)
+    batch_size=4)
 
+# optimiser
+adam = tf.keras.optimizers.Adam()
+efficient_det.compile(optimizer=adam)
+efficient_det.set_loss(loss)
 
+efficient_det.fit(
+    dataset.training_set(),
+    validation_data=dataset.validation_set(),
+    epochs=1
+)

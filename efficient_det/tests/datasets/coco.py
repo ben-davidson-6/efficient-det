@@ -66,4 +66,5 @@ def test_coco_looks_ok(coco, plt):
         if j == k:
             break
     plt.suptitle('Examples from training set of coco\ndo the boxes fit?')
+    plt.saveas = f"{plt.saveas[:-4]}.png"
 

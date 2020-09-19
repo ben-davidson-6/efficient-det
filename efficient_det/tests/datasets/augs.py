@@ -72,5 +72,6 @@ def test_augmenting_looks_good(random_example_in_image, plt):
         plot_mod = Plotter(image_mod, bboxes_mod)
         plot_mod.plot((3, 2, k + 2), f'example {k}', plt)
     plt.suptitle('Cropping and scaling while keeping the boxes\n should make sense')
+    plt.saveas = f"{plt.saveas[:-4]}.png"
 
 
