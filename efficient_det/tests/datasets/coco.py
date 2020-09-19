@@ -3,7 +3,6 @@ import efficient_det.datasets.coco
 import efficient_det.datasets.train_data_prep as train_data_prep
 import efficient_det.model
 import tensorflow as tf
-import matplotlib.pyplot as plt
 
 from efficient_det.common.plot import Plotter
 from efficient_det.common.box import Boxes
@@ -28,7 +27,7 @@ def coco():
         anchors=anchors,
         augmentations=None,
         basic_training_prep=prepper,
-        batch_size=2)
+        batch_size=6)
 
 
 def test_types_and_shapes(coco):
@@ -53,20 +52,18 @@ def test_types_and_shapes(coco):
         break
 
 
-def test_looks_ok(coco):
+def test_coco_looks_ok(coco, plt):
     # val doesnt get shuffled
     ds = coco.training_set()
-    k = 1
+    k = 5
     for j, (image, regressions) in enumerate(ds):
         first_image = image[0]
         first_regression = [(x[0], y[0]) for x, y in regressions]
-        print(first_regression[0][0].shape)
-        print(first_regression[0][1].shape)
         absos, labels = coco.anchors.regressions_to_tlbr(first_regression)
         boxes = Boxes.from_image_and_boxes(first_image, absos)
         plotter = Plotter(first_image/255, boxes)
-        plotter.plot()
-        plt.show()
+        plotter.plot(subplot=(3, 2, j + 1), title='', plt=plt)
         if j == k:
             break
+    plt.suptitle('Examples from training set of coco\ndo the boxes fit?')
 

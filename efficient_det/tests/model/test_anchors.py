@@ -1,6 +1,5 @@
 import pytest
 import tensorflow as tf
-import numpy as np
 
 from efficient_det.model.anchor import EfficientDetAnchors
 from efficient_det.common.box import Boxes
@@ -109,16 +108,14 @@ def test_box_to_regression_and_back():
     tf.debugging.assert_near(tf.cast(box, tf.float32), box_from_regree)
 
 
-@pytest.mark.skip(reason='visual confirmation')
-def test_visual_example():
-    import matplotlib.pyplot as plt
+def test_from_raw_to_regression_and_back_visual(plt):
     val_ds = Coco.raw_dataset(Coco.validation)
     anchors = EfficientDetAnchors(
         size=4,
         aspects=[(1, 1.), (0.7, 1.4), (1.4, 0.7)],
         num_levels=3,
-        iou_match_thresh=0.4)
-    for example in val_ds:
+        iou_match_thresh=0.)
+    for k, example in enumerate(val_ds):
         gt_boxes = Boxes.from_image_boxes_labels(
             example['image'],
             example['objects']['bbox'],
@@ -128,10 +125,24 @@ def test_visual_example():
         absos, labels = anchors.regressions_to_tlbr(regressions)
 
         plotter_original = Plotter(example['image'], gt_boxes)
-        plotter_original.plot((2, 1, 1))
+        plotter_original.plot((2, 2, 2*k + 1), f'raw coco example {k}', plt)
         mod_boxes = Boxes.from_image_and_boxes(example['image'], absos)
         plotter_original = Plotter(example['image'], mod_boxes)
-        plotter_original.plot((2, 1, 2))
-        plt.show()
-        break
+        plotter_original.plot((2, 2, 2*k + 2), f'regression and back {k}', plt)
+        if k == 1:
+            break
+    plt.suptitle(
+        'plotting raw from dataset, and then converting to a\n'
+        'regression and back, should both look the same')
 
+
+def test_empty_boxes():
+    image = tf.random.uniform([64, 64, 3])
+    box = tf.zeros([0, 4])
+    labels = tf.zeros([0])
+    box = Boxes.from_image_boxes_labels(image, box, labels)
+    anchors = EfficientDetAnchors(size=1, aspects=[(1, 1.)], num_levels=3, iou_match_thresh=0.)
+
+    regressions = anchors.absolute_to_regression(box)
+    for x in regressions:
+        pass

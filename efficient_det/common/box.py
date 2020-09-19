@@ -51,6 +51,9 @@ class Boxes:
         self.box_tensor /= normalisation
         return self.box_tensor
 
+    def are_empty(self):
+        return tf.shape(self.box_tensor)[0] == 0
+
     def _normalisation_tensor(self):
         tensor = tf.stack([self.image_height, self.image_width, self.image_height, self.image_width])[None]
         return tf.cast(tensor, tf.float32)

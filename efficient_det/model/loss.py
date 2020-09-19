@@ -18,6 +18,8 @@ class SampleWeightCalculator:
         todo this could be made fancier by sampling according to y_pred
           end up doing some kind of hard negative mining, atm we dont
           use y_pred at all, could also normalise the weight of the mask
+          could also make sure to add at least some negative in the case
+          that there are no positives
         Parameters
         ----------
         y_true: [b, h, w, n_anchor]

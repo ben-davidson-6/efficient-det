@@ -1,4 +1,4 @@
-import matplotlib.pyplot as plt
+import matplotlib.pyplot
 import tensorflow as tf
 
 from efficient_det.common.box import Boxes
@@ -28,11 +28,17 @@ class Plotter:
             Plotter.COLORS)[0]
         return bboxes
 
-    def plot(self, subplot=None, title=''):
-        if title:
-            plt.suptitle(title)
+    def plot(self, subplot=None, title='', plt=None):
+        if plt is None:
+            plt = matplotlib.pyplot
+
         if subplot:
-            plt.subplot(*subplot)
+            ax = plt.subplot(*subplot)
+            if title:
+                ax.title.set_text(title)
+        else:
+            if title:
+                plt.suptitle(title, wrap=True)
         plt.imshow(self.draw_boxes())
         plt.axis('off')
 

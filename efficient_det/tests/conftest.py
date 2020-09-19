@@ -2,6 +2,7 @@ import pytest
 import os
 import numpy as np
 
+
 from pathlib import Path
 from PIL import Image
 
@@ -21,3 +22,5 @@ def actual_image():
 @pytest.fixture
 def valid_model_names():
     return list(['b{}'.format(i) for i in range(8)])
+
+

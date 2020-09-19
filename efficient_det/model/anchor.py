@@ -68,7 +68,7 @@ class EfficientDetAnchors:
             with nan being a negative
         """
         for level in range(self.num_levels):
-            yield self._assign_boxes_to_level(boxes, level)
+            yield self._build_boxes_for_level(boxes, level)
 
     def regressions_to_tlbr(self, regressions):
         """
@@ -106,6 +106,17 @@ class EfficientDetAnchors:
     def _regress_to_absolute_tlbr(self, level, regression):
         absolutes = self._regress_to_absolute_individual_level(level, regression)
         return Boxes.absolute_as_tlbr(absolutes)
+
+    def _build_boxes_for_level(self, boxes, level):
+        return tf.cond(
+            tf.size(boxes.box_tensor) == 0,
+            lambda: self._empty_level(boxes, level),
+            lambda: self._assign_boxes_to_level(boxes, level))
+
+    def _empty_level(self, boxes, level):
+        default_boxes = self._default_boxes_for_absolute(level, boxes)
+        empty_class = tf.ones(tf.shape(default_boxes)[:-1], dtype=tf.int64)*efficient_det.NO_CLASS_LABEL
+        return empty_class, default_boxes
 
     def _assign_boxes_to_level(self, boxes, level):
         """
