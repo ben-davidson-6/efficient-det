@@ -7,7 +7,6 @@ import tensorflow as tf
 #      add evaluations both summaries and final
 #      setup a keras.fit pipeline basically
 
-
 # anchors
 # todo add octaves between levels
 anchor_size = 4
@@ -30,15 +29,15 @@ num_classes = 80
 network = model.EfficientDetNetwork(phi, num_classes, anchors.num_boxes())
 
 # loss
-# todo mask the right things/ normalise with sample weight
-#      just check that I do not need to any exponential stuff to the box loss, pretty sure I dont
 loss_weights = tf.constant([0.5, 0.5])
 alpha = 0.25
 gamma = 1.5
 delta = 0.1
-class_loss = model.FocalLoss(alpha, gamma)
+prop_neg = 2
+class_loss = model.FocalLoss(alpha, gamma, num_classes)
 box_loss = model.BoxRegressionLoss(delta)
-loss = model.EfficientDetLoss(class_loss, box_loss, loss_weights)
+sample_weight_calculator = model.SampleWeightCalculator(prop_neg, num_classes)
+loss = model.EfficientDetLoss(class_loss, box_loss, loss_weights, num_classes, sample_weight_calculator)
 
 # dataset
 # todo add augmentations

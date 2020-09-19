@@ -56,10 +56,12 @@ def test_types_and_shapes(coco):
 def test_looks_ok(coco):
     # val doesnt get shuffled
     ds = coco.training_set()
-    k = 5
+    k = 1
     for j, (image, regressions) in enumerate(ds):
         first_image = image[0]
         first_regression = [(x[0], y[0]) for x, y in regressions]
+        print(first_regression[0][0].shape)
+        print(first_regression[0][1].shape)
         absos, labels = coco.anchors.regressions_to_tlbr(first_regression)
         boxes = Boxes.from_image_and_boxes(first_image, absos)
         plotter = Plotter(first_image/255, boxes)

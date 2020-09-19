@@ -5,8 +5,9 @@ class DetectionHead(tf.keras.layers.Layer):
     def __init__(self, num_class, num_anchors_per_pixel, repeats, dropout_rate=0.2, depth=32):
         super(DetectionHead, self).__init__()
         self.num_classifications = num_class * num_anchors_per_pixel
-        self.num_anchors = num_anchors_per_pixel * 4
-        num_predictions = self.num_classifications + self.num_anchors
+        self.num_anchors = num_anchors_per_pixel
+        self.num_anchor_regressions = num_anchors_per_pixel * 4
+        num_predictions = self.num_classifications + self.num_anchor_regressions
         self.fully_connected_head = FullyConnectedHead(num_predictions, repeats, dropout_rate, depth)
 
     def call(self, inputs, training=None):
@@ -20,9 +21,13 @@ class DetectionHead(tf.keras.layers.Layer):
     def _reshape_output(self, output):
         classifications = output[..., :self.num_classifications]
         regressions = output[..., self.num_classifications:]
-        regressions = tf.stack(tf.split(regressions, num_or_size_splits=self.num_anchors, axis=-1), axis=-1)
+        regressions = self._reshape_predictions_to_each_anchor(regressions)
+        classifications = self._reshape_predictions_to_each_anchor(classifications)
         return classifications, regressions
 
+    def _reshape_predictions_to_each_anchor(self, tensor):
+        """takes tensor with final dimension self.num_anchors*x -> self.num_anchors, x"""
+        return tf.stack(tf.split(tensor, num_or_size_splits=self.num_anchors, axis=-1), axis=-2)
 
 class FullyConnectedHead(tf.keras.layers.Layer):
     def __init__(self, number_predictions, repeats, dropout_rate, depth):
