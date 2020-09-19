@@ -9,7 +9,7 @@ NAME = 'coco/2017'
 class Coco(efficient_det.datasets.dataset.Dataset):
 
     def _raw_training_set(self,):
-        ds = Coco.raw_dataset(Coco.validation)
+        ds = Coco.raw_dataset(Coco.train)
         ds = ds.map(Coco.get_image_box_label)
         return ds
 

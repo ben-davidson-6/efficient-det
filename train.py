@@ -1,3 +1,6 @@
+import os
+os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
+
 import efficient_det.model as model
 import efficient_det.datasets.coco as coco
 import efficient_det.datasets.train_data_prep as train_data_prep
@@ -42,7 +45,7 @@ loss = model.EfficientDetLoss(class_loss, box_loss, loss_weights, num_classes, s
 # dataset
 # todo add augmentations
 #      tune the maps,
-prepper = train_data_prep.ImageBasicPreparation(min_scale=0.1, max_scale=1.5, target_shape=128)
+prepper = train_data_prep.ImageBasicPreparation(min_scale=0.1, max_scale=1.5, target_shape=512)
 dataset = coco.Coco(
     anchors=anchors,
     augmentations=None,
@@ -50,10 +53,10 @@ dataset = coco.Coco(
     batch_size=4)
 
 # optimiser
+# todo make this basically custom training loop
 adam = tf.keras.optimizers.Adam()
 efficient_det.compile(optimizer=adam)
 efficient_det.set_loss(loss)
-
 efficient_det.fit(
     dataset.training_set(),
     validation_data=dataset.validation_set(),

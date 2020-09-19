@@ -90,7 +90,6 @@ class EfficientDetLoss(tf.keras.losses.Loss):
         y_pred_class, y_pred_regression = y_pred[0], y_pred[1]
         y_pred_class = tf.nn.sigmoid(y_pred_class)
         sample_weight, y_true_class = self.sample_weight_calculator.mask_and_update_class(y_true_class, y_pred_class)
-        print(y_true_class)
         fl = self.focal_loss(y_true_class, y_pred_class, sample_weight) * self.weights[0]
         bl = self.box_loss(y_true_regression, y_pred_regression, sample_weight) * self.weights[1]
         return fl + bl
