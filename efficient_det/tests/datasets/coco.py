@@ -58,7 +58,7 @@ def test_coco_looks_ok(coco, plt):
     k = 5
     for j, (image, regressions) in enumerate(ds):
         first_image = image[0]
-        first_regression = [(x[0], y[0]) for x, y in regressions]
+        first_regression = [x[0] for x in regressions]
         absos, labels = coco.anchors.regressions_to_tlbr(first_regression)
         boxes = Boxes.from_image_and_boxes(first_image, absos)
         plotter = Plotter(first_image/255, boxes)

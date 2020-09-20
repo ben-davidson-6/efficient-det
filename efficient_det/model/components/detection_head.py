@@ -11,12 +11,12 @@ class DetectionHead(tf.keras.layers.Layer):
         self.fully_connected_head = FullyConnectedHead(num_predictions, repeats, dropout_rate, depth)
 
     def call(self, inputs, training=None):
-        seperated = []
+        """Outputs [b, h, w, n_anchor, 4 + num_class]"""
+        outputs = []
         mixed_outputs = self.fully_connected_head(inputs, training)
         for output in mixed_outputs:
-            classifications, regressions = self._reshape_output(output)
-            seperated.append((classifications, regressions))
-        return seperated
+            outputs.append(self._reshape_predictions_to_each_anchor(output))
+        return outputs
 
     def _reshape_output(self, output):
         classifications = output[..., :self.num_classifications]

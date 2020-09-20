@@ -75,23 +75,22 @@ class EfficientDetLoss(tf.keras.losses.Loss):
 
         Parameters
         ----------
-        y_true : tuple of tensors (class, regression)
-            class      : [batch, height_i, width_i, n_anchors, n_classes]
-            regression : [batch, height_i, width_i, n_anchors, 4]
-            and where class == NO_CLASS_LABEL indicates there was no overlapping box
-        y_pred : tupl of tensors (class, regresssion
-            class      : [batch, height_i, width_i, n_anchors, n_classes]
-            regression : [batch, height_i, width_i, n_anchors, 4]
+        y_true : tensor of shape [batch, height_i, width_i, n_anchors, 1 + 4]
+            the first element in the final dimension is the class hackily stored as
+            a float and the remaining are regression
+        y_pred : tensor of shape [batch, height_i, width_i, n_anchors, n_classes + 4]
+
         Returns
         -------
 
         """
-        y_true_class, y_true_regression = y_true[0], y_true[1]
-        y_pred_class, y_pred_regression = y_pred[0], y_pred[1]
+        y_true_class, y_true_regression = tf.cast(y_true[..., 0], tf.int32), y_true[..., 1:]
+        y_pred_class, y_pred_regression = y_pred[..., :self.n_classes], y_pred[..., self.n_classes:]
         y_pred_class = tf.nn.sigmoid(y_pred_class)
-        sample_weight, y_true_class = self.sample_weight_calculator.mask_and_update_class(y_true_class, y_pred_class)
-        fl = self.focal_loss(y_true_class, y_pred_class, sample_weight) * self.weights[0]
-        bl = self.box_loss(y_true_regression, y_pred_regression, sample_weight) * self.weights[1]
+        sample_weight_box = tf.cast(y_true_class != NO_CLASS_LABEL, tf.float32)
+        sample_weight_focal, y_true_class = self.sample_weight_calculator.mask_and_update_class(y_true_class, y_pred_class)
+        fl = self.focal_loss(y_true_class, y_pred_class, sample_weight_focal) * self.weights[0]
+        bl = self.box_loss(y_true_regression, y_pred_regression, sample_weight_box) * self.weights[1]
         return fl + bl
 
 

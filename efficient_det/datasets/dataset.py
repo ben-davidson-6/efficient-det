@@ -23,19 +23,20 @@ class Dataset:
 
     def training_set(self):
         ds = self._raw_training_set()
-        ds = ds.map(self.basic_training_prep.scale_and_random_crop_normalised)
-        ds = ds.map(self._build_regressions)
+        ds = ds.map(self.basic_training_prep.scale_and_random_crop_normalised, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+        ds = ds.map(self._build_regressions, num_parallel_calls=tf.data.experimental.AUTOTUNE)
         ds = ds.batch(self.batch_size).prefetch(tf.data.experimental.AUTOTUNE)
-        ds = ds.map(self.augmentations)
+        ds = ds.map(self.augmentations, num_parallel_calls=tf.data.experimental.AUTOTUNE)
         return ds
 
     def validation_set(self):
         ds = self._raw_validation_set()
-        ds = ds.map(self._build_regressions)
+        ds = ds.map(self._build_regressions, num_parallel_calls=tf.data.experimental.AUTOTUNE)
         ds = ds.batch(1).prefetch(tf.data.experimental.AUTOTUNE)
         return ds
 
     def _build_regressions(self, image, bboxes, labels):
+        """regressions is  a single tensor with final dim = 5 = class + regression"""
         bboxes = Boxes.from_image_boxes_labels(image, bboxes, labels)
         regressions = self.anchors.absolute_to_regression(bboxes)
         return image, regressions

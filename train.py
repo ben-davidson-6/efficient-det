@@ -6,12 +6,22 @@ import efficient_det.datasets.coco as coco
 import efficient_det.datasets.train_data_prep as train_data_prep
 import tensorflow as tf
 
-# todo add some seeding functionality to reproduce
-#      add evaluations both summaries and final
-#      setup a keras.fit pipeline basically
+# todo
+#   add some seeding functionality to reproduce
+#   add training metrics
+#   add some kind of regression class to simplify passing a tensor around
+#   add octaves between levels
+#   add extra downampling layer
+#   add augmentations
+#   move to conda and setup environment
+#   build callbacks, probably custom
+#       saving
+#       tensorboard
+#   inference
+#       non maximal suppresion
+
 
 # anchors
-# todo add octaves between levels
 anchor_size = 4
 anchor_aspects = [
     (1., 1.),
@@ -26,7 +36,6 @@ anchors = model.EfficientDetAnchors(
     iou_match_thresh=iou_match_thresh)
 
 # network
-# todo add downsampling layer
 phi = 0
 num_classes = 80
 efficient_det = model.EfficientDetNetwork(phi, num_classes, anchors.num_boxes())
@@ -43,8 +52,6 @@ sample_weight_calculator = model.SampleWeightCalculator(prop_neg, num_classes)
 loss = model.EfficientDetLoss(class_loss, box_loss, loss_weights, num_classes, sample_weight_calculator)
 
 # dataset
-# todo add augmentations
-#      tune the maps,
 prepper = train_data_prep.ImageBasicPreparation(min_scale=0.1, max_scale=1.5, target_shape=512)
 dataset = coco.Coco(
     anchors=anchors,
@@ -52,13 +59,17 @@ dataset = coco.Coco(
     basic_training_prep=prepper,
     batch_size=4)
 
-# optimiser
-# todo make this basically custom training loop
+# training loop
 adam = tf.keras.optimizers.Adam()
-efficient_det.compile(optimizer=adam)
-efficient_det.set_loss(loss)
+efficient_det.compile(optimizer=adam, loss=loss)
+cbs = [tf.keras.callbacks.TensorBoard(
+    log_dir='logs', histogram_freq=0, write_graph=False, write_images=False,
+    update_freq='epoch', profile_batch=2, embeddings_freq=0,
+    embeddings_metadata=None
+)]
 efficient_det.fit(
     dataset.training_set(),
     validation_data=dataset.validation_set(),
-    epochs=1
+    epochs=1,
+    callbacks=cbs
 )

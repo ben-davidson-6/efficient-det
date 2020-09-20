@@ -102,9 +102,10 @@ def test_box_to_regression_and_back():
 
     anchors = EfficientDetAnchors(size=1, aspects=[(1, 1.)], num_levels=3, iou_match_thresh=0.)
 
-    label, regressions = anchors._assign_boxes_to_level(boxes, level)
-    tf.debugging.assert_near(regressions[1, 1, 0], tf.constant(expected_regression))
-    box_from_regree = anchors._regress_to_absolute_tlbr(level, regressions)[1, 1, 0]
+    regressions = anchors._assign_boxes_to_level(boxes, level)
+    tf.debugging.assert_near(regressions[1, 1, 0, 1:], tf.constant(expected_regression))
+
+    box_from_regree = anchors._regress_to_absolute_tlbr(level, regressions[..., 1:])[1, 1, 0]
     tf.debugging.assert_near(tf.cast(box, tf.float32), box_from_regree)
 
 

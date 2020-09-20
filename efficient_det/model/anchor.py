@@ -80,7 +80,7 @@ class EfficientDetAnchors:
 
         Parameters
         ----------
-        regressions : generator of tuples (regression, regression_label) for a single image
+        regressions : a list of tensors like [hi, wi, 1 + 4] class + regression
 
         Returns
         -------
@@ -91,7 +91,10 @@ class EfficientDetAnchors:
         """
         tlbr_boxes = []
         labels = []
-        for level, (regression_label, regression) in enumerate(regressions):
+        for level, regression in enumerate(regressions):
+            regression_label = regression[..., 0]
+            regression = regression[..., 1:]
+
             boxes = self._regress_to_absolute_tlbr(level, regression)
             boxes_out = tf.boolean_mask(boxes, regression_label != efficient_det.NO_CLASS_LABEL)
             labels_out = tf.boolean_mask(regression_label, regression_label != efficient_det.NO_CLASS_LABEL)
@@ -120,8 +123,8 @@ class EfficientDetAnchors:
 
     def _empty_level(self, boxes, level):
         default_boxes = self._default_boxes_for_absolute(level, boxes)
-        empty_class = tf.ones(tf.shape(default_boxes)[:-1], dtype=tf.int64)*efficient_det.NO_CLASS_LABEL
-        return empty_class, default_boxes
+        empty_class = tf.ones(tf.shape(default_boxes)[:-1], dtype=tf.float32)*efficient_det.NO_CLASS_LABEL
+        return tf.concat([empty_class[..., None], default_boxes], axis=-1)
 
     def _assign_boxes_to_level(self, boxes, level):
         """
@@ -147,7 +150,7 @@ class EfficientDetAnchors:
             best_box_classes,
             tf.ones_like(best_box_classes)*efficient_det.NO_CLASS_LABEL)
         correspond_regression = EfficientDetAnchors._regression_from_boxes(default_boxes, best_boxes)
-        return best_box_classes, correspond_regression
+        return tf.concat([tf.cast(best_box_classes[..., None], tf.float32), correspond_regression], axis=-1)
 
     @staticmethod
     def _regression_from_boxes(default_boxes, target_boxes):
