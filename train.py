@@ -9,9 +9,7 @@ import tensorflow as tf
 # todo
 #   build callbacks, probably custom
 #       saving
-#       tensorboard
 #   add training metrics
-#   should we work with normalised regressions?
 #   add some seeding functionality to reproduce
 #   add octaves between levels
 #   add extra downampling layer
@@ -19,6 +17,7 @@ import tensorflow as tf
 #   move to conda and setup environment
 #   inference
 #       non maximal suppresion
+#   the matching takes a long time, we could do this once and for all per network
 
 
 # anchors
