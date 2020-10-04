@@ -40,13 +40,13 @@ class Boxes:
         self.image_height = image_height
         self.image_width = image_width
 
-    @check_normalised
+    # @check_normalised
     def unnormalise(self):
         unnormalisation = self._normalisation_tensor()
         self.box_tensor *= unnormalisation
         return self.box_tensor
 
-    @check_unnormalised
+    # @check_unnormalised
     def normalise(self,):
         normalisation = self._normalisation_tensor()
         self.box_tensor /= normalisation

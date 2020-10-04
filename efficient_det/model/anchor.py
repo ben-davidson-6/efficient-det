@@ -13,6 +13,7 @@ class EfficientDetAnchors:
         self.iou_match_thresh = iou_match_thresh
         tf.debugging.assert_rank(aspects, 2)
 
+    @tf.function
     def absolute_to_regression(self, boxes):
         """
         Take a  boxes object containing a tensor of bounding boxes
@@ -119,6 +120,7 @@ class EfficientDetAnchors:
         absolutes = self._regress_to_absolute_individual_level(level, regression)
         return Boxes.absolute_as_tlbr(absolutes)
 
+    @tf.function
     def _build_boxes_for_level(self, boxes, level):
         return tf.cond(
             tf.size(boxes.box_tensor) == 0,

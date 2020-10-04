@@ -5,7 +5,9 @@ import efficient_det.model as model
 import efficient_det.datasets.coco as coco
 import efficient_det.datasets.train_data_prep as train_data_prep
 import tensorflow as tf
+from tensorflow.python.framework.ops import disable_eager_execution
 
+# disable_eager_execution()
 # todo
 #   build callbacks, probably custom
 #       saving
@@ -21,7 +23,7 @@ import tensorflow as tf
 
 
 # anchors
-anchor_size = 4
+anchor_size = 6
 anchor_aspects = [
     (1., 1.),
     (.7, 1.4),
@@ -59,14 +61,14 @@ dataset = coco.Coco(
     batch_size=4)
 
 # training loop
-adam = tf.keras.optimizers.Adam(learning_rate=0.0001)
+adam = tf.keras.optimizers.Adam()
 efficient_det.compile(optimizer=adam, loss=loss)
 cbs = [model.TensorboardCallback(dataset.training_set(), dataset.validation_set(), 'logs')]
 efficient_det.fit(
-    dataset.training_set(),
-    #validation_data=dataset.validation_set(),
-    epochs=10,
+    dataset.training_set().take(1).repeat(),
+    # validation_data=dataset.validation_set().take(1),
+    epochs=50,
     callbacks=cbs,
-    steps_per_epoch=500,
-    validation_steps=100,
+    steps_per_epoch=100,
+    validation_steps=0,
 )

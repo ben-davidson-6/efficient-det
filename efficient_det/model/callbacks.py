@@ -36,7 +36,6 @@ class TensorboardCallback(tf.keras.callbacks.Callback):
 
     def on_epoch_end(self, epoch, logs=None):
         pass
-        # self.write_metric_stats(epoch, logs)
 
     def on_test_batch_end(self, batch, logs=None):
         with self.validation_writer.as_default():
@@ -68,7 +67,7 @@ class TensorboardCallback(tf.keras.callbacks.Callback):
 
     def _draw_summary_images(self, with_model=False):
         validation = []
-        thresh = 0.5 if with_model else 0.
+        thresh = 0. if with_model else 0.
         for image, regression in self.validation_examples:
             if with_model:
                 regression = self.model(image, training=False)
@@ -115,17 +114,6 @@ class TensorboardCallback(tf.keras.callbacks.Callback):
         validation = tf.concat([validation_gt, validation_image], axis=0)
         training = tf.concat([training_gt, training_image], axis=0)
         return validation[None], training[None]
-
-    # def _apply_model_for_drawing(self, image):
-    #     """the output of the model has a score for each class, but we just care if anything should be drawn"""
-    #     regression = self.model(image, training=False)
-    #     proccesed_regression = []
-    #     for sub_reg in regression:
-    #         regression_box = sub_reg[..., -4:]
-    #         should_show = tf.nn.sigmoid(sub_reg[..., :-4]) > 0.5
-    #         label = tf.where(tf.reduce_any(should_show, axis=-1, keepdims=True), 1., -1.)
-    #         proccesed_regression.append(tf.concat([label, regression_box], axis=-1))
-    #     return proccesed_regression
 
     @staticmethod
     def _make_file_writer(log_dir, name):

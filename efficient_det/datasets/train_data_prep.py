@@ -26,6 +26,7 @@ class ImageBasicPreparation:
     def scale_and_random_crop_normalised(self, image, bbox, labels):
         return self.scale_and_random_crop_unnormalised(image, bbox, labels)
 
+    @tf.function
     def scale_and_random_crop_unnormalised(self, image, bbox, labels):
         """bboxes must be unnormalised!"""
         image, bbox = self._random_scale_image(image, bbox)
