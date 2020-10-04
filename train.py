@@ -7,16 +7,16 @@ import efficient_det.datasets.train_data_prep as train_data_prep
 import tensorflow as tf
 
 # todo
-#   add some seeding functionality to reproduce
+#   build callbacks, probably custom
+#       saving
+#       tensorboard
 #   add training metrics
-#   add some kind of regression class to simplify passing a tensor around
+#   should we work with normalised regressions?
+#   add some seeding functionality to reproduce
 #   add octaves between levels
 #   add extra downampling layer
 #   add augmentations
 #   move to conda and setup environment
-#   build callbacks, probably custom
-#       saving
-#       tensorboard
 #   inference
 #       non maximal suppresion
 
@@ -28,7 +28,7 @@ anchor_aspects = [
     (.7, 1.4),
     (1.4, 0.7),
 ]
-iou_match_thresh = 0.5
+iou_match_thresh = 0.3
 anchors = model.EfficientDetAnchors(
     anchor_size,
     anchor_aspects,
@@ -38,7 +38,7 @@ anchors = model.EfficientDetAnchors(
 # network
 phi = 0
 num_classes = 80
-efficient_det = model.EfficientDetNetwork(phi, num_classes, anchors.num_boxes())
+efficient_det = model.EfficientDetNetwork(phi, num_classes, anchors)
 
 # loss
 loss_weights = tf.constant([0.5, 0.5])
@@ -52,7 +52,7 @@ sample_weight_calculator = model.SampleWeightCalculator(prop_neg, num_classes)
 loss = model.EfficientDetLoss(class_loss, box_loss, loss_weights, num_classes, sample_weight_calculator)
 
 # dataset
-prepper = train_data_prep.ImageBasicPreparation(min_scale=0.1, max_scale=1.5, target_shape=512)
+prepper = train_data_prep.ImageBasicPreparation(min_scale=0.5, max_scale=1.5, target_shape=512)
 dataset = coco.Coco(
     anchors=anchors,
     augmentations=None,
@@ -60,16 +60,14 @@ dataset = coco.Coco(
     batch_size=4)
 
 # training loop
-adam = tf.keras.optimizers.Adam()
+adam = tf.keras.optimizers.Adam(learning_rate=0.0001)
 efficient_det.compile(optimizer=adam, loss=loss)
-cbs = [tf.keras.callbacks.TensorBoard(
-    log_dir='logs', histogram_freq=0, write_graph=False, write_images=False,
-    update_freq='epoch', profile_batch=2, embeddings_freq=0,
-    embeddings_metadata=None
-)]
+cbs = [model.TensorboardCallback(dataset.training_set(), dataset.validation_set(), 'logs')]
 efficient_det.fit(
     dataset.training_set(),
-    validation_data=dataset.validation_set(),
-    epochs=1,
-    callbacks=cbs
+    #validation_data=dataset.validation_set(),
+    epochs=10,
+    callbacks=cbs,
+    steps_per_epoch=500,
+    validation_steps=100,
 )

@@ -7,7 +7,7 @@ import efficient_det.model
 def unnormalise(f):
     def deco(self, image, bbox, labels):
         bbox = efficient_det.common.box.Boxes.from_image_and_boxes(image, bbox)
-        bbox.unnormalise()
+        bbox._unnormalise()
 
         image, bbox_unnormalised, labels = f(self, image, bbox.box_tensor, labels)
 

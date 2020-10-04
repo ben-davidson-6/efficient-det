@@ -41,3 +41,4 @@ class Backbone(tf.keras.layers.Layer):
         elif phi == 7:
             return tf.keras.applications.EfficientNetB7, (263, 560, 812)
 
+

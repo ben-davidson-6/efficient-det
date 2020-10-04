@@ -9,21 +9,22 @@ from efficient_det.model.components.detection_head import DetectionHead
 class EfficientDetNetwork(tf.keras.Model):
     N_LEVELS = 3
 
-    def __init__(self, phi, num_classes, num_anchors):
+    def __init__(self, phi, num_classes, anchors):
         super(EfficientDetNetwork, self).__init__()
         self.num_classes = num_classes
-        self.num_anchors = num_anchors
+        self.anchors = anchors
+        self.num_anchors = anchors.num_boxes()
         self.phi = phi
         self.backbone = self.get_backbone()
         self.bifpn = self.get_bifpn()
         self.detection_head = self.get_detection_head()
-        self.loss = None
-        self.optimizer = None
 
     def call(self, x, training=None, mask=None):
+        # todo add make sure is sufficiently even
         x = self.backbone(x, training)
         x = self.bifpn(x, training)
         x = self.detection_head(x, training)
+        [tf.debugging.check_numerics(y, 'Found nans in output of model', name=None) for y in x]
         return x
 
     def get_backbone(self):

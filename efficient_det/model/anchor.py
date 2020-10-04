@@ -13,32 +13,6 @@ class EfficientDetAnchors:
         self.iou_match_thresh = iou_match_thresh
         tf.debugging.assert_rank(aspects, 2)
 
-    def regression_to_absolute(self, regressions):
-        """
-        Convert a list of regressions into a list of absolute box coordinates, in
-        unnormalised pixel coordinates
-
-        Parameters
-        ----------
-        regressions : list of arrays of shape [batch_size, h_i, w_i, n, 4]
-            each box must be written (ox, oy, sx, sy) where exp(sx) and exp(sy)
-            scale default height and width, and ox, oy offset default centroids
-            with default centroids being defined by the leve/stride implicit in the
-            list.
-
-        Returns
-        -------
-        output : yield array of shape [batch_size, h_i, w_i, n, 4]
-            (cx, cy, w/2, h/2) center x, y and widht and height in pixels
-        """
-        out = []
-        for level, regression in enumerate(regressions):
-            # add fake batch
-            if regression.ndim == 4:
-                regression = tf.expand_dims(regression, axis=0)
-            out.append(self._regress_to_absolute_individual_level(level, regression))
-        return out
-
     def absolute_to_regression(self, boxes):
         """
         Take a  boxes object containing a tensor of bounding boxes
@@ -70,10 +44,12 @@ class EfficientDetAnchors:
             from the default boxes as well as [h_i, w_i, n] indication the classes
             with nan being a negative
         """
-        out = ()
+        out = []
         for level in range(self.num_levels):
-            out += (self._build_boxes_for_level(boxes, level),)
-        return out
+            classes, regression = self._build_boxes_for_level(boxes, level)
+            regression = EfficientDetAnchors._normalise_regression(regression, boxes)
+            out.append(tf.concat([classes, regression], axis=-1))
+        return tuple(out)
 
     def regressions_to_tlbr(self, regressions):
         """
@@ -94,13 +70,41 @@ class EfficientDetAnchors:
         for level, regression in enumerate(regressions):
             regression_label = regression[..., 0]
             regression = regression[..., 1:]
-
+            regression = EfficientDetAnchors._unnormalise_regression(regression, level)
             boxes = self._regress_to_absolute_tlbr(level, regression)
             boxes_out = tf.boolean_mask(boxes, regression_label != efficient_det.NO_CLASS_LABEL)
             labels_out = tf.boolean_mask(regression_label, regression_label != efficient_det.NO_CLASS_LABEL)
             tlbr_boxes.append(boxes_out)
             labels.append(labels_out)
         return tf.concat(tlbr_boxes, axis=0), tf.concat(labels, axis=0)
+
+    def model_out_to_tlbr(self, model_output, thresh=0.5):
+        """
+
+        Parameters
+        ----------
+        regressions : a list of tensors like [hi, wi, 1 + 4] class + regression
+
+        Returns
+        -------
+
+        box tensor : [n, 4] in tlbr format
+        label tensor : [n]
+
+        """
+        regressions = []
+        for sub_out in model_output:
+            # labels
+            label_probs = tf.nn.sigmoid(sub_out[..., :-4])
+            best_class = tf.cast(tf.argmax(label_probs, axis=-1)[..., None], tf.float32)
+            should_show = tf.reduce_max(label_probs, axis=-1, keepdims=True) > thresh
+            reg_label = tf.where(should_show, best_class, efficient_det.NO_CLASS_LABEL)
+            # regression
+            regression_bboxes = sub_out[..., -4:]
+            # join back together
+            sub_reg = tf.concat([reg_label, regression_bboxes], axis=-1)
+            regressions.append(sub_reg)
+        return self.regressions_to_tlbr(regressions)
 
     def _regress_to_absolute_individual_level(self, level, regression):
         default_boxes = self._default_boxes_for_regression(level, regression)
@@ -122,9 +126,10 @@ class EfficientDetAnchors:
             lambda: self._assign_boxes_to_level(boxes, level))
 
     def _empty_level(self, boxes, level):
-        default_boxes = self._default_boxes_for_absolute(level, boxes)
+        image_height, image_width = boxes.get_image_dimensions()
+        default_boxes = self._default_boxes_for_absolute(level, image_height, image_width)
         empty_class = tf.ones(tf.shape(default_boxes)[:-1], dtype=tf.float32)*efficient_det.NO_CLASS_LABEL
-        return tf.concat([empty_class[..., None], default_boxes], axis=-1)
+        return empty_class[..., None], default_boxes
 
     def _assign_boxes_to_level(self, boxes, level):
         """
@@ -143,14 +148,16 @@ class EfficientDetAnchors:
         regressions : tensors of shape [1, h_i, w_i, n, 4] corresponding to the regressions
         classes : integer tensor of shape [h_i, w_i, n] indication the classes with nan indicating a negative
         """
-        default_boxes = self._default_boxes_for_absolute(level, boxes)
+        image_height, image_width = boxes.get_image_dimensions()
+        default_boxes = self._default_boxes_for_absolute(level, image_height, image_width)
         best_box_classes, best_ious, best_boxes = boxes.match_with_anchor(default_boxes)
         best_box_classes = tf.where(
             best_ious > self.iou_match_thresh,
             best_box_classes,
             tf.ones_like(best_box_classes)*efficient_det.NO_CLASS_LABEL)
         correspond_regression = EfficientDetAnchors._regression_from_boxes(default_boxes, best_boxes)
-        return tf.concat([tf.cast(best_box_classes[..., None], tf.float32), correspond_regression], axis=-1)
+        classes = tf.cast(best_box_classes[..., None], tf.float32)
+        return classes, correspond_regression
 
     @staticmethod
     def _regression_from_boxes(default_boxes, target_boxes):
@@ -200,14 +207,33 @@ class EfficientDetAnchors:
         default_boxes = self._default_box_tensor(level, h, w)
         return default_boxes
 
-    def _default_boxes_for_absolute(self, level, boxes):
-        image_width, image_height = boxes.get_image_dimensions()
+    def _default_boxes_for_absolute(self, level, image_height, image_width):
         stride = EfficientDetAnchors._level_to_stride(level)
         regress_height, regress_width = image_height//stride, image_width//stride
         return self._default_box_tensor(level, regress_height, regress_width)
 
     def num_boxes(self):
         return self.num_anchors
+
+    @staticmethod
+    def _normalise_regression(regression, boxes):
+        image_height, image_width = boxes.get_image_dimensions()
+        norm = EfficientDetAnchors._regression_normalisation(image_height, image_width)
+        return regression / norm
+
+    @staticmethod
+    def _unnormalise_regression(regression, level):
+        h, w = EfficientDetAnchors._regression_height_width(regression)
+        stride = EfficientDetAnchors._level_to_stride(level)
+        image_height, image_width = h*stride, w*stride
+        norm = EfficientDetAnchors._regression_normalisation(image_height, image_width)
+        return regression * norm
+
+    @staticmethod
+    def _regression_normalisation(image_height, image_width):
+        norm = tf.cast(tf.stack([image_width, image_height], axis=0), tf.float32)
+        norm = tf.concat([norm, tf.ones([2])], axis=0)
+        return norm[None, None, None]
 
     @staticmethod
     def _regression_height_width(regression):

@@ -102,10 +102,10 @@ def test_box_to_regression_and_back():
 
     anchors = EfficientDetAnchors(size=1, aspects=[(1, 1.)], num_levels=3, iou_match_thresh=0.)
 
-    regressions = anchors._assign_boxes_to_level(boxes, level)
-    tf.debugging.assert_near(regressions[1, 1, 0, 1:], tf.constant(expected_regression))
+    classes, regressions = anchors._assign_boxes_to_level(boxes, level)
+    tf.debugging.assert_near(regressions[1, 1, 0], tf.constant(expected_regression))
 
-    box_from_regree = anchors._regress_to_absolute_tlbr(level, regressions[..., 1:])[1, 1, 0]
+    box_from_regree = anchors._regress_to_absolute_tlbr(level, regressions)[1, 1, 0]
     tf.debugging.assert_near(tf.cast(box, tf.float32), box_from_regree)
 
 
@@ -136,6 +136,7 @@ def test_from_raw_to_regression_and_back_visual(plt):
         'plotting raw from dataset, and then converting to a\n'
         'regression and back, should both look the same')
     plt.saveas = f"{plt.saveas[:-4]}.png"
+
 
 def test_empty_boxes():
     image = tf.random.uniform([64, 64, 3])

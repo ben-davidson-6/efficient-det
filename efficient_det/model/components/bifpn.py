@@ -105,7 +105,7 @@ class BiFPNNode(tf.keras.layers.Layer):
         """inputs[-1] should be the node that needs to be increased or decreased"""
         self.assert_recieved_correct_number_inputs(inputs)
         inputs = self.resize_final_input(inputs)
-        x = self.weight_and_concat(inputs)
+        x = self.weight_each(inputs)
         x = self.concater(x)
         x = self.seperable_conv(x)
         x = self.bn(x, training=training)
@@ -115,7 +115,7 @@ class BiFPNNode(tf.keras.layers.Layer):
     def resize_final_input(self, inputs):
         return [i for i in inputs[:-1]] + [self.resampler(inputs[-1])]
 
-    def weight_and_concat(self, inputs):
+    def weight_each(self, inputs):
         normaliser = tf.reduce_sum(self.fusion_weights) + BiFPNNode.eps
         weights = self.fusion_weights / normaliser
         weighted = [weights[i] * x for i, x in enumerate(inputs)]

@@ -6,8 +6,8 @@ def check_normalised(f):
         gt = tf.reduce_all(tf.greater_equal(self.box_tensor, 0))
         lt = tf.reduce_all(tf.less_equal(self.box_tensor, 1))
         if not tf.logical_and(gt, lt):
-            tf.print('WARNING you are trying to normalise something which looks normal')
-        f(self)
+            tf.print('WARNING you are trying to unnormalise something which looks unnormal')
+        return f(self)
     return deco_f
 
 
@@ -15,8 +15,9 @@ def check_unnormalised(f):
     def deco_f(self):
         gt = tf.reduce_any(tf.greater(self.box_tensor, 1))
         if not gt:
-            tf.print('WARNING you are trying to unnormalise something which looks unnormal')
-        f(self)
+            tf.print('WARNING you are trying to normalise something which looks normal')
+            tf.print(tf.reduce_mean(self.box_tensor))
+        return f(self)
     return deco_f
 
 
@@ -58,8 +59,12 @@ class Boxes:
         tensor = tf.stack([self.image_height, self.image_width, self.image_height, self.image_width])[None]
         return tf.cast(tensor, tf.float32)
 
+    def image_dim_normalisation_tensor(self):
+        tensor = tf.stack([self.image_width, self.image_height])
+        return tf.cast(tensor, tf.float32)
+
     def get_image_dimensions(self):
-        return self.image_width, self.image_height
+        return self.image_height, self.image_width
 
     def boxes_as_centroid_and_widths(self):
         centroid_x = (self.box_tensor[:, 1] + self.box_tensor[:, 3])/2
