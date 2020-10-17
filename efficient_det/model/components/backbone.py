@@ -8,7 +8,7 @@ class Backbone(tf.keras.layers.Layer):
         self.backbone = Backbone.application_factory(model_name)
 
     def __call__(self, x, training=None):
-        # input should be float but 0.-255. not 0.-1.
+        # input should be a float between 0-255
         return self.backbone(x, training)
 
     @staticmethod

@@ -16,7 +16,7 @@ def coco():
         (.7, 1.4),
         (1.4, 0.7),
     ]
-    iou_match_thresh = 0.
+    iou_match_thresh = 0.3
     anchors = efficient_det.model.EfficientDetAnchors(
         anchor_size,
         anchor_aspects,
@@ -68,3 +68,18 @@ def test_coco_looks_ok(coco, plt):
     plt.suptitle('Examples from training set of coco\ndo the boxes fit?')
     plt.saveas = f"{plt.saveas[:-4]}.png"
 
+
+def test_coco_labels(coco, plt):
+    # val doesnt get shuffled
+    ds = coco.training_set()
+    k = 5
+    import numpy as np
+    for j, (image, regressions) in enumerate(ds):
+        first_image = image[0]
+        first_regression = [x[0] for x in regressions]
+        labels = [x[..., 0] for x in first_regression]
+        print([np.sum(x != -1) for x in labels])
+        if j == k:
+            break
+    # plt.suptitle('Examples from training set of coco\ndo the boxes fit?')
+    # plt.saveas = f"{plt.saveas[:-4]}.png"

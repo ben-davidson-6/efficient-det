@@ -12,12 +12,6 @@ class TensorboardCallback(tf.keras.callbacks.Callback):
 
     def __init__(self, training_set: tf.data.Dataset, validation_set: tf.data.Dataset, logdir: str):
         super(TensorboardCallback, self).__init__()
-        # todo the training examples actually need to be processed a little
-        #   we should have them in the same form as validation (image, regression)
-        #   we should also put these into tlbr format so we can just draw them once?
-        #   we can save the groundtruth and draw it once then at start of each epoch vstack them
-        #   will need to reshape the val examples so they are same shape and we can display them all
-        #   one colour for correct one for incorrect
         self.validation_examples = TensorboardCallback.extract_data_from_validation(validation_set)
         for image, regression in training_set.take(1):
             self.training_examples = (image, regression)
@@ -67,7 +61,7 @@ class TensorboardCallback(tf.keras.callbacks.Callback):
 
     def _draw_summary_images(self, with_model=False):
         validation = []
-        thresh = 0. if with_model else 0.
+        thresh = 0.5 if with_model else 0.
         for image, regression in self.validation_examples:
             if with_model:
                 regression = self.model(image, training=False)
