@@ -91,7 +91,7 @@ class SingleAnchorAtLevelBuilder:
 class Anchors:
     def __init__(self, num_levels, configs):
         self.num_levels = num_levels
-        self.configs = configs
+        self.aspects = configs
         self.anchors = self._build_anchors_at_level()
 
     def to_tlbr_tensor(self, default_box_offsets: tuple):
@@ -102,7 +102,7 @@ class Anchors:
         return [a.to_offset_tensor(boxes, image_height, image_width) for a in self.anchors]
 
     def _build_anchors_at_level(self):
-        return [AnchorsAtLevel(level, self.configs) for level in range(self.num_levels)]
+        return [AnchorsAtLevel(level, self.aspects) for level in range(self.num_levels)]
 
 
 def build_anchors(size, num_levels, aspects):
