@@ -1,7 +1,7 @@
 import matplotlib.pyplot
 import tensorflow as tf
 
-from efficient_det.common.box import Boxes
+from efficient_det.geometry.box import Boxes
 from efficient_det.model.anchor import EfficientDetAnchors
 
 

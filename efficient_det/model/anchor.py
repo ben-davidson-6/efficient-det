@@ -1,6 +1,91 @@
 import tensorflow as tf
 import efficient_det
-from efficient_det.common.box import Boxes
+
+from efficient_det.geometry.box import Boxes, DefaultAnchorBoxes, TLBRBoxes, DefaultAnchorOffsets, CentroidWidthBoxes
+from efficient_det.geometry.common import level_to_stride, pixel_coordinates
+
+
+class SingleAnchorConfig:
+    def __init__(self, size, aspects):
+        self.size = size
+        self.aspects = aspects
+
+    def box_size(self, level):
+        stride = level_to_stride(level)
+        unit_aspect = stride * self.size
+        return unit_aspect*self.aspects
+
+
+class AnchorsAtLevel:
+    def __init__(self, level, configs):
+        self.level = level
+        self.anchor_builders = [SingleAnchorAtLevelBuilder(config, level) for level, config in enumerate(configs)]
+
+    def match_boxes(self, boxes: TLBRBoxes, image_height: int, image_width: int):
+        anchors = self._build_anchors(image_height, image_width)
+        ious = anchors.iou(boxes, as_original_shape=True)
+        max_iou = tf.reduce_max(ious, axis=-1)
+        best_box = tf.argmax(ious, axis=-1)
+        best_box = boxes.create_box_tensor_from_indices(best_box)
+        return max_iou, TLBRBoxes(best_box)
+
+    def to_tlbr_tensor(self, default_box_offsets: tf.Tensor):
+        """regression should be height, width, n_anchors, 4"""
+        image_height, image_width = self._original_image_size_from_default_offsets(default_box_offsets)
+        anchors = self._build_anchors(image_height, image_width)
+        offsets = DefaultAnchorOffsets(default_box_offsets)
+        tlbr_boxes = offsets.as_centroid_width_box(anchors, as_original_shape=True)
+        return tlbr_boxes
+
+    def to_offset_tensor(self, boxes: TLBRBoxes, image_height: int, image_width: int):
+        ious, best_box = self.match_boxes(boxes, image_height, image_width)
+        anchors = self._build_anchors(image_height, image_width)
+        centroid_boxes = best_box.as_centroid_and_width_box()
+        offset = centroid_boxes.as_offset_boxes(anchors, as_original_shape=True)
+        return offset
+
+    def _build_anchors(self, image_height, image_width):
+        anchor_tensors = tf.stack([a.build_anchors(image_height, image_width).get_tensor() for a in self.anchor_builders], axis=-1)
+        return CentroidWidthBoxes(anchor_tensors).as_tlbr_box()
+
+    def _original_image_size_from_default_offsets(self, regression):
+        regression_shape = tf.shape(regression)
+        image_height = level_to_stride(self.level)*regression_shape[0]
+        image_width = level_to_stride(self.level)*regression_shape[1]
+        return image_height, image_width
+
+
+class SingleAnchorAtLevelBuilder:
+
+    def __init__(self, single_anchor_config, level):
+        self.config = single_anchor_config
+        self.level = level
+
+    def build_anchors(self, image_height, image_width):
+        stride_height, stride_width = self._normalised_stride(image_height, image_width)
+        grid_height, grid_width = self._grid_dimensions(image_height, image_width)
+        box_height, box_width = self._box_shape(image_height, image_width)
+        anchors = DefaultAnchorBoxes(
+            stride_height,
+            stride_width,
+            grid_height,
+            grid_width,
+            box_height,
+            box_width)
+        return anchors
+
+    def _normalised_stride(self, image_height, image_width):
+        stride = level_to_stride(self.level)
+        return stride/image_height, stride/image_width
+
+    def _grid_dimensions(self, image_height, image_width):
+        stride = level_to_stride(self.level)
+        return image_height//stride, image_width//stride
+
+    def _box_shape(self, image_height, image_width):
+        box_shape = self.config.box_size(self.level)
+        normalised_box_shape = box_shape / tf.constant([image_height, image_width])
+        return normalised_box_shape[0], normalised_box_shape[1]
 
 
 class EfficientDetAnchors:
@@ -13,7 +98,6 @@ class EfficientDetAnchors:
         self.iou_match_thresh = iou_match_thresh
         tf.debugging.assert_rank(aspects, 2)
 
-    @tf.function
     def absolute_to_regression(self, boxes):
         """
         Take a  boxes object containing a tensor of bounding boxes
@@ -120,7 +204,6 @@ class EfficientDetAnchors:
         absolutes = self._regress_to_absolute_individual_level(level, regression)
         return Boxes.absolute_as_tlbr(absolutes)
 
-    @tf.function
     def _build_boxes_for_level(self, boxes, level):
         return tf.cond(
             tf.size(boxes.box_tensor) == 0,
@@ -176,12 +259,12 @@ class EfficientDetAnchors:
 
     @staticmethod
     def _default_absolute_centroids(level, height, width):
-        stride = EfficientDetAnchors._level_to_stride(level)
-        pixel_coords = EfficientDetAnchors._get_pixel_coords(height, width)
+        stride = level_to_stride(level)
+        pixel_coords = pixel_coordinates(height, width)
         return pixel_coords*stride + stride//2
 
     def _default_width_height(self, level):
-        stride = EfficientDetAnchors._level_to_stride(level)
+        stride = level_to_stride(level)
         unit_aspect = stride*self.size
         return unit_aspect*self.aspects/2.
 
@@ -194,23 +277,13 @@ class EfficientDetAnchors:
         width_height = tf.tile(width_height[None, None], (height, width, 1, 1))
         return tf.concat([default_centroids, width_height], axis=-1)
 
-    @staticmethod
-    def _level_to_stride(level):
-        return 2**(3 + level)
-
-    @staticmethod
-    def _get_pixel_coords(height, width):
-        xs = tf.range(width, dtype=tf.float32)
-        ys = tf.range(height, dtype=tf.float32)
-        return tf.stack(tf.meshgrid(xs, ys), axis=-1)
-
     def _default_boxes_for_regression(self, level, regression):
         h, w = EfficientDetAnchors._regression_height_width(regression)
         default_boxes = self._default_box_tensor(level, h, w)
         return default_boxes
 
     def _default_boxes_for_absolute(self, level, image_height, image_width):
-        stride = EfficientDetAnchors._level_to_stride(level)
+        stride = level_to_stride(level)
         regress_height, regress_width = image_height//stride, image_width//stride
         return self._default_box_tensor(level, regress_height, regress_width)
 
@@ -226,7 +299,7 @@ class EfficientDetAnchors:
     @staticmethod
     def _unnormalise_regression(regression, level):
         h, w = EfficientDetAnchors._regression_height_width(regression)
-        stride = EfficientDetAnchors._level_to_stride(level)
+        stride = level_to_stride(level)
         image_height, image_width = h*stride, w*stride
         norm = EfficientDetAnchors._regression_normalisation(image_height, image_width)
         return regression * norm

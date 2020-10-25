@@ -11,7 +11,7 @@ import efficient_det.model as model
 @pytest.fixture
 def dataset_and_compiled_model():
     a = anchors.EfficientDetAnchors(4, [(1., 1.)], num_levels=3, iou_match_thresh=0.1)
-    prepper = train_data_prep.ImageBasicPreparation(min_scale=0.1, max_scale=1.5, target_shape=512)
+    prepper = train_data_prep.ImageBasicPreparation(min_scale=0.1, max_scale=1.5, target_shape=256)
     dataset = coco.Coco(a, None, prepper, batch_size=4)
 
     # network
@@ -24,11 +24,9 @@ def dataset_and_compiled_model():
     alpha = 0.25
     gamma = 1.5
     delta = 0.1
-    prop_neg = 2
     class_loss = model.FocalLoss(alpha, gamma, num_classes)
     box_loss = model.BoxRegressionLoss(delta)
-    sample_weight_calculator = model.SampleWeightCalculator(prop_neg, num_classes)
-    loss = model.EfficientDetLoss(class_loss, box_loss, loss_weights, num_classes, sample_weight_calculator)
+    loss = model.EfficientDetLoss(class_loss, box_loss, loss_weights, num_classes)
     efficient_det.compile(optimizer='adam', loss=loss)
     return dataset, efficient_det
 

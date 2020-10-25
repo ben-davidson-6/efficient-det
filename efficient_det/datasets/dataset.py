@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 from efficient_det.model.anchor import EfficientDetAnchors
-from efficient_det.common.box import Boxes
+from efficient_det.geometry.box import Boxes
 from efficient_det.datasets.augs import Augmenter
 from efficient_det.datasets.train_data_prep import ImageBasicPreparation
 
@@ -32,7 +32,6 @@ class Dataset:
 
     def validation_set(self):
         ds = self._raw_validation_set()
-        # todo hack for time being, the shape of inputes need to be divisible by 8 or something
         ds = ds.map(self._closest_acceptable_multiple)
         ds = ds.map(self._unnormalise, num_parallel_calls=tf.data.experimental.AUTOTUNE)
         ds = ds.map(self._build_regressions, num_parallel_calls=tf.data.experimental.AUTOTUNE)

@@ -1,14 +1,16 @@
 import pytest
 import tensorflow as tf
+import numpy as np
 
 from efficient_det.model.anchor import EfficientDetAnchors
-from efficient_det.common.box import Boxes
-from efficient_det.common.plot import Plotter
+from efficient_det.geometry.box import Boxes
+from efficient_det.geometry.common import pixel_coordinates
+from efficient_det.geometry.plot import Plotter
 from efficient_det.datasets.coco import Coco
 
 
 def test_row_col_grid():
-    grid = EfficientDetAnchors._get_pixel_coords(2, 2)
+    grid = pixel_coordinates(2, 2)
     x = grid[..., 0]
     x_desired = tf.constant([
         [0, 1.],
@@ -148,3 +150,20 @@ def test_empty_boxes():
     regressions = anchors.absolute_to_regression(box)
     for x in regressions:
         pass
+
+
+def test_default_boxes(plt):
+    n_levels = 3
+    anchors = EfficientDetAnchors(
+        size=4,
+        aspects=[(1, 1.), (0.75, 1.5)],
+        num_levels=n_levels,
+        iou_match_thresh=0.)
+    height = width = 32
+    im = np.zeros([height*8, width*8, 1], dtype=np.uint8)
+    for i in range(1):
+        boxes = anchors._default_box_tensor(i, height, width)
+        plt.imshow(im)
+        plt.scatter(boxes[..., 0], boxes[..., 1], s=0.5)
+    plt.show()
+    plt.saveas = f"{plt.saveas[:-4]}.png"

@@ -43,10 +43,20 @@ class EfficientDetNetwork(tf.keras.Model):
         return DetectionHead(self.num_classes, self.num_anchors, repeats)
 
 
+class InferenceEfficientNet:
+    def __init__(self, efficient_det):
+        self.efficient_det = efficient_det
 
+    def __call__(self, x, training):
+        regression = self.efficient_det(x, training)
+        box, label, score = InferenceEfficientNet._regression_unpack(regression)
 
-
-
-
+    @staticmethod
+    def _regression_unpack(regression):
+        box = regression[..., -4:]
+        probabilities = tf.nn.sigmoid(regression[..., :-4])
+        score = tf.reduce_max(probabilities, axis=-1, keepdims=True)
+        label = tf.argmax(score, axis=-1, keepdims=True)
+        return box, label, score
 
 

@@ -1,12 +1,12 @@
 import tensorflow as tf
 
-import efficient_det.common.box
+import efficient_det.geometry.box
 import efficient_det.model
 
 
 def unnormalise(f):
     def deco(self, image, bbox, labels):
-        bbox = efficient_det.common.box.Boxes.from_image_and_boxes(image, bbox)
+        bbox = efficient_det.geometry.box.Boxes.from_image_and_boxes(image, bbox)
         bbox._unnormalise()
 
         image, bbox_unnormalised, labels = f(self, image, bbox.box_tensor, labels)
@@ -53,8 +53,8 @@ class ImageBasicPreparation:
 
     @staticmethod
     def _crop_bboxes(bboxes, labels, tlbr):
-        reduced_boxes = efficient_det.common.box.Boxes.intersecting_boxes(tlbr[None], bboxes)[0]
-        valid_boxes = efficient_det.common.box.Boxes.box_area(reduced_boxes) > 0
+        reduced_boxes = efficient_det.geometry.box.Boxes.intersecting_boxes(tlbr[None], bboxes)[0]
+        valid_boxes = efficient_det.geometry.box.Boxes.box_area(reduced_boxes) > 0
 
         offset = tlbr[:2]
         reduced_boxes -= tf.concat([offset, offset], axis=0)[None]

@@ -4,8 +4,8 @@ import efficient_det.datasets.train_data_prep as train_data_prep
 import efficient_det.model
 import tensorflow as tf
 
-from efficient_det.common.plot import Plotter
-from efficient_det.common.box import Boxes
+from efficient_det.geometry.plot import Plotter
+from efficient_det.geometry.box import Boxes
 
 
 @pytest.fixture
@@ -69,7 +69,7 @@ def test_coco_looks_ok(coco, plt):
     plt.saveas = f"{plt.saveas[:-4]}.png"
 
 
-def test_coco_labels(coco, plt):
+def test_anchors_are_matched(coco, plt):
     # val doesnt get shuffled
     ds = coco.training_set()
     k = 5
@@ -78,7 +78,6 @@ def test_coco_labels(coco, plt):
         first_image = image[0]
         first_regression = [x[0] for x in regressions]
         labels = [x[..., 0] for x in first_regression]
-        print([np.sum(x != -1) for x in labels])
         if j == k:
             break
     # plt.suptitle('Examples from training set of coco\ndo the boxes fit?')

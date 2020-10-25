@@ -29,6 +29,7 @@ class DetectionHead(tf.keras.layers.Layer):
         """takes tensor with final dimension self.num_anchors*x -> self.num_anchors, x"""
         return tf.stack(tf.split(tensor, num_or_size_splits=self.num_anchors, axis=-1), axis=-2)
 
+
 class FullyConnectedHead(tf.keras.layers.Layer):
     def __init__(self, number_predictions, repeats, dropout_rate, depth):
         super(FullyConnectedHead, self).__init__()
@@ -39,18 +40,18 @@ class FullyConnectedHead(tf.keras.layers.Layer):
         self.classification_layer = tf.keras.layers.Conv2D(
             filters=number_predictions,
             kernel_size=1,
-            use_bias=False)
+            use_bias=False,
+            dtype=tf.float32)
 
     def call(self, inputs, training=None):
         outputs = []
         for level in inputs:
-            outputs.append(self.put_level_through_head(level, training))
+            outputs.append(self.put_level_through_head(level))
         return outputs
 
-    def put_level_through_head(self, x, training):
+    def put_level_through_head(self, x):
         for conv in self.convs:
             x = conv(x)
-        x = self.dropout(x, training)
         x = self.classification_layer(x)
         return x
 
@@ -59,8 +60,10 @@ class FullyConnectedHead(tf.keras.layers.Layer):
             self.depth,
             kernel_size=3,
             padding='SAME',
+            activation='relu',
             pointwise_initializer=tf.initializers.VarianceScaling(),
             depthwise_initializer=tf.initializers.VarianceScaling(),
+            dtype=tf.float32
         )
 
 

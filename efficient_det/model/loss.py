@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 from efficient_det import NO_CLASS_LABEL
-
+# todo normalise by box size
 
 class EfficientDetLoss(tf.keras.losses.Loss):
     def __init__(self, focal_loss, box_loss, weights, n_classes):
@@ -32,9 +32,15 @@ class EfficientDetLoss(tf.keras.losses.Loss):
         y_pred_class = tf.nn.sigmoid(y_pred_class)
         fl = self.focal_loss(y_true_class, y_pred_class) * self.weights[0]
 
-        sample_weight_box = tf.cast(y_true_class != NO_CLASS_LABEL, tf.float32)
-        bl = self.box_loss(y_true_regression, y_pred_regression, sample_weight_box) * self.weights[1]
+        non_background = self._calculate_mask_and_normaliser(y_true)
+        bl = self.box_loss(y_true_regression, y_pred_regression, non_background) * self.weights[1]
         return fl + bl
+
+    def _calculate_mask_and_normaliser(self, y_true_class):
+        non_background = tf.cast(y_true_class != NO_CLASS_LABEL, tf.float32)
+        num_positive_per_image = tf.reduce_sum(non_background, [1, 2, 3], keepdims=True)
+        non_background = non_background/num_positive_per_image
+        return non_background
 
 
 class FocalLoss(tf.keras.losses.Loss):
@@ -47,7 +53,6 @@ class FocalLoss(tf.keras.losses.Loss):
     def _prep_inputs(self, y_true, y_pred):
         y_true = tf.one_hot(y_true, depth=self.n_classes)
         eps = tf.keras.backend.epsilon()
-        y_pred = y_pred + eps
         y_pred = tf.clip_by_value(y_pred, eps, 1.0 - eps)
         return y_true, y_pred
 

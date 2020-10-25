@@ -1,7 +1,7 @@
 import tensorflow as tf
 import pathlib
 
-from efficient_det.common import box, plot
+from efficient_det.geometry import box, plot
 
 
 class TensorboardCallback(tf.keras.callbacks.Callback):

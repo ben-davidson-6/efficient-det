@@ -4,8 +4,8 @@ import efficient_det.datasets.augs as augs
 import efficient_det.datasets.train_data_prep
 import random
 
-from efficient_det.common.box import Boxes
-from efficient_det.common.plot import Plotter
+from efficient_det.geometry.box import Boxes
+from efficient_det.geometry.plot import Plotter
 
 
 @pytest.fixture(scope='module')

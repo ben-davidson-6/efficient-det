@@ -15,7 +15,7 @@ class Backbone(tf.keras.layers.Layer):
     def application_factory(phi):
         application_builder, layer_indices = Backbone.application_selector(phi)
         backbone = application_builder(include_top=False, input_shape=[None, None, 3])
-        backbone_feature_tensors = [backbone.layers[index].output for index in layer_indices]
+        backbone_feature_tensors = [backbone.layers[index].model_output_single for index in layer_indices]
         return tf.keras.Model(backbone.input, outputs=backbone_feature_tensors)
 
     @staticmethod
