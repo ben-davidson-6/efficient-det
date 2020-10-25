@@ -15,7 +15,7 @@ class EfficientDetNetwork(tf.keras.Model):
         super(EfficientDetNetwork, self).__init__()
         self.num_classes = num_classes
         self.anchors = anchors
-        self.num_anchors = len(anchors.configs)
+        self.num_anchors = len(anchors.aspects)
         self.phi = phi
         self.backbone = self.get_backbone()
         self.downsampler = Downsampler(depth=64, n_extra=n_extra_downsamples)
