@@ -23,17 +23,12 @@ import datetime
 
 # anchors
 anchor_size = 4
-anchor_aspects = [
+aspects = [
     (1., 1.),
     (.75, 1.5),
     (1.5, 0.75),
 ]
-iou_match_thresh = 0.3
-anchors = model.EfficientDetAnchors(
-    anchor_size,
-    anchor_aspects,
-    num_levels=6,
-    iou_match_thresh=iou_match_thresh)
+anchors = model.build_anchors(anchor_size, num_levels=6, aspects=aspects)
 
 # network
 phi = 0
@@ -51,10 +46,12 @@ loss = model.EfficientDetLoss(class_loss, box_loss, loss_weights, num_classes)
 
 # dataset
 prepper = train_data_prep.ImageBasicPreparation(min_scale=0.8, max_scale=1.2, target_shape=512)
+iou_match_thresh = 0.3
 dataset = coco.Coco(
     anchors=anchors,
     augmentations=None,
     basic_training_prep=prepper,
+    iou_thresh=iou_match_thresh,
     batch_size=4)
 
 # training loop
@@ -71,12 +68,11 @@ save_model = tf.keras.callbacks.ModelCheckpoint(
     save_freq='epoch')
 tensorboard_vis = model.TensorboardCallback(dataset.training_set(), dataset.validation_set(), f'./artifacts/logs/{time}')
 cbs = [save_model, tensorboard_vis]
-
 efficient_det.fit(
     dataset.training_set().repeat(),
     validation_data=dataset.validation_set().repeat(),
     steps_per_epoch=2000,
     validation_steps=500,
-    epochs=2000,
+    epochs=999999,
     callbacks=cbs
 )

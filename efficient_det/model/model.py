@@ -11,10 +11,11 @@ class EfficientDetNetwork(tf.keras.Model):
     N_LEVELS = 3
 
     def __init__(self, phi, num_classes, anchors, n_extra_downsamples=3):
+        # todo could validate num levels here
         super(EfficientDetNetwork, self).__init__()
         self.num_classes = num_classes
         self.anchors = anchors
-        self.num_anchors = anchors.num_boxes()
+        self.num_anchors = len(anchors.configs)
         self.phi = phi
         self.backbone = self.get_backbone()
         self.downsampler = Downsampler(depth=64, n_extra=n_extra_downsamples)
@@ -48,15 +49,24 @@ class InferenceEfficientNet:
         self.efficient_det = efficient_det
 
     def __call__(self, x, training):
-        regression = self.efficient_det(x, training)
-        box, label, score = InferenceEfficientNet._regression_unpack(regression)
+        model_out = self.efficient_det(x, training)
+        boxes, label, score = self.process_output(model_out)
+        return boxes, label, score
+
+    def process_output(self, model_out):
+        offset_tensors, label, score = InferenceEfficientNet._regression_unpack(model_out)
+        offset_tensors = self.efficient_det.anchors.to_tlbr_tensor(offset_tensors)
+        return offset_tensors, label, score
 
     @staticmethod
-    def _regression_unpack(regression):
-        box = regression[..., -4:]
-        probabilities = tf.nn.sigmoid(regression[..., :-4])
-        score = tf.reduce_max(probabilities, axis=-1, keepdims=True)
-        label = tf.argmax(score, axis=-1, keepdims=True)
-        return box, label, score
+    def _regression_unpack(model_out):
+        out = []
+        for level_out in model_out:
+            offset = level_out[..., -4:]
+            probabilities = tf.nn.sigmoid(level_out[..., :-4])
+            score = tf.reduce_max(probabilities, axis=-1, keepdims=True)
+            label = tf.argmax(score, axis=-1)[..., None]
+            out.append((offset, label, score))
+        return zip(*out)
 
 

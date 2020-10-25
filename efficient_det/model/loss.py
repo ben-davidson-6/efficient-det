@@ -3,6 +3,7 @@ import tensorflow as tf
 from efficient_det import NO_CLASS_LABEL
 # todo normalise by box size
 
+
 class EfficientDetLoss(tf.keras.losses.Loss):
     def __init__(self, focal_loss, box_loss, weights, n_classes):
         super(EfficientDetLoss, self).__init__(name='efficient_det_loss')
@@ -39,7 +40,7 @@ class EfficientDetLoss(tf.keras.losses.Loss):
     def _calculate_mask_and_normaliser(self, y_true_class):
         non_background = tf.cast(y_true_class != NO_CLASS_LABEL, tf.float32)
         num_positive_per_image = tf.reduce_sum(non_background, [1, 2, 3], keepdims=True)
-        non_background = non_background/num_positive_per_image
+        non_background = non_background/tf.maximum(num_positive_per_image, 1)
         return non_background
 
 

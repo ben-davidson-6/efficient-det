@@ -1,9 +1,10 @@
 import tensorflow as tf
+import efficient_det
 
-from efficient_det.model.anchor import EfficientDetAnchors
-from efficient_det.geometry.box import Boxes
+from efficient_det.model.anchor import Anchors
 from efficient_det.datasets.augs import Augmenter
 from efficient_det.datasets.train_data_prep import ImageBasicPreparation
+from efficient_det.geometry.box import TLBRBoxes
 
 
 class Dataset:
@@ -12,20 +13,21 @@ class Dataset:
 
     def __init__(
             self,
-            anchors: EfficientDetAnchors,
+            anchors: Anchors,
             augmentations: Augmenter,
             basic_training_prep: ImageBasicPreparation,
+            iou_thresh: float,
             batch_size: int):
         self.basic_training_prep = basic_training_prep
         self.batch_size = batch_size
         self.anchors = anchors
+        self.iou_thresh = iou_thresh
         self.augmentations = lambda x, y: (x, y) if augmentations is None else augmentations
 
     def training_set(self):
         ds = self._raw_training_set()
-        ds = ds.map(self._unnormalise, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-        ds = ds.map(self.basic_training_prep.scale_and_random_crop_unnormalised, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-        ds = ds.map(self._build_regressions, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+        ds = ds.map(self.basic_training_prep.scale_and_random_crop, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+        ds = ds.map(self._build_offset_boxes, num_parallel_calls=tf.data.experimental.AUTOTUNE)
         ds = ds.batch(self.batch_size).prefetch(tf.data.experimental.AUTOTUNE)
         ds = ds.map(self.augmentations, num_parallel_calls=tf.data.experimental.AUTOTUNE)
         return ds
@@ -33,20 +35,21 @@ class Dataset:
     def validation_set(self):
         ds = self._raw_validation_set()
         ds = ds.map(self._closest_acceptable_multiple)
-        ds = ds.map(self._unnormalise, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-        ds = ds.map(self._build_regressions, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+        ds = ds.map(self._build_offset_boxes, num_parallel_calls=tf.data.experimental.AUTOTUNE)
         ds = ds.batch(1).prefetch(tf.data.experimental.AUTOTUNE)
         return ds
 
-    def _unnormalise(self, image, bboxes, labels):
-        bboxes = Boxes.from_image_boxes_labels(image, bboxes, labels)
-        return image, bboxes.unnormalise(), labels
-
-    def _build_regressions(self, image, bboxes, labels):
+    def _build_offset_boxes(self, image, bboxes, labels):
         """regressions is  a single tensor with final dim = 5 = class + regression"""
-        bboxes = Boxes.from_image_boxes_labels(image, bboxes, labels)
-        regressions = self.anchors.absolute_to_regression(bboxes)
-        return image, regressions
+        height, width, channel = image.shape#
+        bboxes = TLBRBoxes(bboxes)
+        offsets_ious_boxes = self.anchors.to_offset_tensors(bboxes, height, width)
+        offsets, ious, matched_boxes = zip(*offsets_ious_boxes)
+        labels = [tf.gather(tf.cast(labels, tf.float32), box) for box in matched_boxes]
+        ious = [x > self.iou_thresh for x in ious]
+        labels = [tf.where(iou, label, efficient_det.NO_CLASS_LABEL) for iou, label in zip(ious, labels)]
+        offset = tuple([tf.concat([label[..., None], offset], axis=-1) for label, offset in zip(labels, offsets)])
+        return image, offset
 
     def _closest_acceptable_multiple(self, image, box, label):
         # todo hack for the time being
@@ -58,3 +61,4 @@ class Dataset:
 
     def _raw_training_set(self,):
         raise NotImplemented
+

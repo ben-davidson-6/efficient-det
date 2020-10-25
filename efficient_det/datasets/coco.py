@@ -35,4 +35,29 @@ class Coco(efficient_det.datasets.dataset.Dataset):
             shuffle_files=shuffle)
 
 
+if __name__ == '__main__':
+    import efficient_det.model as model
+    import efficient_det.datasets.train_data_prep as train_data_prep
+    # anchors
+    anchor_size = 3
+    aspects = [
+        (1., 1.),
+        (.75, 1.5),
+        (1.5, 0.75),
+    ]
+    anchors = model.build_anchors(anchor_size, num_levels=6, aspects=aspects)
+    # dataset
+    prepper = train_data_prep.ImageBasicPreparation(min_scale=0.8, max_scale=1.2, target_shape=512)
+    iou_match_thresh = 0.3
+    dataset = Coco(
+        anchors=anchors,
+        augmentations=None,
+        basic_training_prep=prepper,
+        iou_thresh=iou_match_thresh,
+        batch_size=1)
 
+    for example in dataset.raw_dataset('train'):
+        image, box, label = Coco.get_image_box_label(example)
+        out = dataset.basic_training_prep.scale_and_random_crop(image, box, label)
+        ds = dataset._build_offset_boxes(*out)
+        break

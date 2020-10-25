@@ -1,7 +1,8 @@
 import tensorflow as tf
 import pathlib
 
-from efficient_det.geometry import box, plot
+from efficient_det.geometry.plot import draw_model_output
+from efficient_det.model.model import InferenceEfficientNet
 
 
 class TensorboardCallback(tf.keras.callbacks.Callback):
@@ -12,6 +13,8 @@ class TensorboardCallback(tf.keras.callbacks.Callback):
 
     def __init__(self, training_set: tf.data.Dataset, validation_set: tf.data.Dataset, logdir: str):
         super(TensorboardCallback, self).__init__()
+        self.inference_net = None
+
         self.validation_examples = TensorboardCallback.extract_data_from_validation(validation_set)
         for image, regression in training_set.take(1):
             self.training_examples = (image, regression)
@@ -24,6 +27,51 @@ class TensorboardCallback(tf.keras.callbacks.Callback):
 
         self.validation_writer = TensorboardCallback._make_file_writer(logdir, TensorboardCallback.VALIDATION_NAME)
         self.training_writer = TensorboardCallback._make_file_writer(logdir, TensorboardCallback.TRAINING_NAME)
+
+    def get_net(self):
+        if self.inference_net is None:
+            self.inference_net = InferenceEfficientNet(self.model)
+        return self.inference_net
+
+    def _draw_summary_images(self, with_model=False):
+        thresh = 0.5 if with_model else 0.
+        validation = self._get_validation_images(thresh, with_model)
+        training = self._get_training_images(thresh, with_model)
+        return validation, training
+
+    def _draw_single_image(self, image, boxes, scores, thresh):
+        for box, score in zip(boxes, scores):
+            to_show = scores > thresh
+            box = tf.boolean_mask(box, to_show)
+            image = tf.image.draw_bounding_boxes(image, box, [(0., 0., 1.), (0., 1., 0.), (1., 0., 0.)])
+        image = tf.image.resize(image, (TensorboardCallback.IMAGE_SIZE, TensorboardCallback.IMAGE_SIZE))
+        return image
+
+    def _get_validation_images(self, thresh, with_model):
+        validation = []
+        for image, offset in self.validation_examples:
+            if with_model:
+                box, label, score = self.get_net()(image, training=False)
+            else:
+                box, label, score = self.get_net().process_output(offset)
+            image = draw_model_output(image, box, score, thresh)
+            image = tf.image.resize(image, (TensorboardCallback.IMAGE_SIZE, TensorboardCallback.IMAGE_SIZE))
+            validation.append(image[0])
+        return validation
+
+    def _get_training_images(self, thresh, with_model):
+        training = []
+        for i in range(TensorboardCallback.MAX_EXAMPLES_PER_DATASET):
+            image = self.training_examples[0][i][None]
+            if with_model:
+                box, label, score = self.get_net()(image, training=False)
+            else:
+                offset = [x[i:i+1] for x in self.training_examples[1]]
+                box, label, score = self.get_net().process_output(offset)
+            image = draw_model_output(image, box, score, thresh)
+            image = tf.image.resize(image, (TensorboardCallback.IMAGE_SIZE, TensorboardCallback.IMAGE_SIZE))
+            training.append(image[0])
+        return training
 
     def on_epoch_begin(self, epoch, logs=None):
         self._write_image_summaries(epoch)
@@ -59,40 +107,14 @@ class TensorboardCallback(tf.keras.callbacks.Callback):
             for key in [k for k in logs if 'val_' in k]:
                 tf.summary.scalar(key.replace('val_', ''), logs[key], step=self.train_batch_counter)
 
-    def _draw_summary_images(self, with_model=False):
-        validation = []
-        thresh = 0.5 if with_model else 0.
-        for image, regression in self.validation_examples:
-            if with_model:
-                regression = self.model(image, training=False)
-            validation.append(self._draw_single_image(tf.cast(image, tf.uint8), regression, thresh))
-
-        training = []
-        for i in range(TensorboardCallback.MAX_EXAMPLES_PER_DATASET):
-            image = self.training_examples[0][i][None]
-            if with_model:
-                regression = self.model(image, training=False)
-            else:
-                regression = [x[i] for x in self.training_examples[1]]
-            training.append(self._draw_single_image(tf.cast(image, tf.uint8), regression, thresh))
-        return validation, training
-
     @staticmethod
     def extract_data_from_validation(validation_set):
         data = []
-        for image, regression in validation_set:
-            data.append((image, regression))
+        for image, offset in validation_set:
+            data.append((image, offset))
             if len(data) == TensorboardCallback.MAX_EXAMPLES_PER_DATASET:
                 break
         return data
-
-    def _draw_single_image(self, image, regression, thresh):
-        boxes, labels = self.model.anchors.model_out_to_tlbr(regression, thresh)
-        bboxes = box.Boxes.from_image_boxes_labels(image[0], boxes, labels)
-        plotter = plot.Plotter(image[0], bboxes, normalised=False)
-        bboxes = plotter.draw_boxes()
-        bboxes = tf.image.resize(bboxes, (TensorboardCallback.IMAGE_SIZE, TensorboardCallback.IMAGE_SIZE))
-        return bboxes
 
     def _build_summary_image(self):
         if self.validation_gt_summary_images is None:

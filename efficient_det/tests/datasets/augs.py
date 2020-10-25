@@ -27,7 +27,7 @@ def single_example():
 
 def test_does_nothing(single_example):
     prepper = efficient_det.datasets.train_data_prep.ImageBasicPreparation(min_scale=1, max_scale=1, target_shape=64)
-    image, bboxes, labels = prepper.scale_and_random_crop_unnormalised(*single_example)
+    image, bboxes, labels = prepper.scale_and_random_crop(*single_example)
     assert labels.shape == single_example[2].shape
     assert bboxes.shape == single_example[1].shape
     assert image.shape == single_example[0].shape
@@ -67,7 +67,7 @@ def test_augmenting_looks_good(random_example_in_image, plt):
 
     for k in range(5):
         prepper = efficient_det.datasets.train_data_prep.ImageBasicPreparation(min_scale=0.5, max_scale=2., target_shape=512)
-        image_mod, bboxes_mod, labels_mod = prepper.scale_and_random_crop_unnormalised(image, bboxes, labels)
+        image_mod, bboxes_mod, labels_mod = prepper.scale_and_random_crop(image, bboxes, labels)
         bboxes_mod = Boxes.from_image_and_boxes(image_mod, bboxes_mod)
         plot_mod = Plotter(image_mod, bboxes_mod)
         plot_mod.plot((3, 2, k + 2), f'example {k}', plt)

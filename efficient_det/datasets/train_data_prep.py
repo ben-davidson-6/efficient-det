@@ -1,18 +1,6 @@
 import tensorflow as tf
 
-import efficient_det.geometry.box
-import efficient_det.model
-
-
-def unnormalise(f):
-    def deco(self, image, bbox, labels):
-        bbox = efficient_det.geometry.box.Boxes.from_image_and_boxes(image, bbox)
-        bbox._unnormalise()
-
-        image, bbox_unnormalised, labels = f(self, image, bbox.box_tensor, labels)
-
-        return image, bbox_unnormalised, labels
-    return deco
+from efficient_det.geometry.box import TLBRBoxes
 
 
 class ImageBasicPreparation:
@@ -22,46 +10,42 @@ class ImageBasicPreparation:
         self.max_scale = max_scale
         self.target_shape = target_shape
 
-    @unnormalise
-    def scale_and_random_crop_normalised(self, image, bbox, labels):
-        return self.scale_and_random_crop_unnormalised(image, bbox, labels)
-
     @tf.function
-    def scale_and_random_crop_unnormalised(self, image, bbox, labels):
+    def scale_and_random_crop(self, image, bbox, labels):
         """bboxes must be unnormalised!"""
-        image, bbox = self._random_scale_image(image, bbox)
+        image = self._random_scale_image(image)
         image, bbox = self._pad_to_target_if_needed(image, bbox)
         image, bbox, labels = self._random_crop(image, bbox, labels)
+        image.set_shape([self.target_shape, self.target_shape, 3])
         return image, bbox, labels
 
-    def _random_scale_image(self, image, bbox):
+    def _random_scale_image(self, image,):
         scale = tf.random.uniform([], self.min_scale, self.max_scale)
         image_hw = ImageBasicPreparation._image_hw(image)
         scaled_shape = tf.cast(scale*tf.cast(image_hw, tf.float32), tf.int32)
-        bbox = tf.cast(tf.cast(bbox, tf.float32)*scale, tf.int32)
-        return tf.image.resize(image, scaled_shape), bbox
+        return tf.image.resize(image, scaled_shape)
 
     def _random_crop(self, image, bboxes, labels):
-        tlbr = self._crop_tlbr_box(image)
-        image = ImageBasicPreparation._crop_image(image, tlbr)
-        bboxes, labels = ImageBasicPreparation._crop_bboxes(bboxes, labels, tlbr)
-        return image, bboxes, labels
+        image_dims = ImageBasicPreparation._image_hw(image)
+        crop_tlbr = self._crop_tlbr_box(image)
+        image = image[crop_tlbr[0]:crop_tlbr[2], crop_tlbr[1]:crop_tlbr[3]]
+        bboxes, labels = self._crop_bboxes(bboxes, labels, crop_tlbr, image_dims)
+        return image, bboxes.get_tensor(), labels
 
-    @staticmethod
-    def _crop_image(image, tlbr):
-        return image[tlbr[0]:tlbr[2], tlbr[1]:tlbr[3]]
+    def _crop_bboxes(self, bboxes, labels, crop_tlbr, image_dim):
+        boxes = TLBRBoxes(bboxes)
+        boxes.unnormalise(image_dim[0], image_dim[1])
+        crop_tlbr = tf.cast(crop_tlbr, tf.float32)
+        cropped_image_tlbr_box = TLBRBoxes(crop_tlbr)
+        cropped_boxes = boxes.intersecting_boxes(cropped_image_tlbr_box)
 
-    @staticmethod
-    def _crop_bboxes(bboxes, labels, tlbr):
-        reduced_boxes = efficient_det.geometry.box.Boxes.intersecting_boxes(tlbr[None], bboxes)[0]
-        valid_boxes = efficient_det.geometry.box.Boxes.box_area(reduced_boxes) > 0
-
-        offset = tlbr[:2]
-        reduced_boxes -= tf.concat([offset, offset], axis=0)[None]
-
-        reduced_boxes = tf.boolean_mask(reduced_boxes, valid_boxes)
-        reduced_labels = tf.boolean_mask(labels, valid_boxes)
-        return reduced_boxes, reduced_labels
+        offset = crop_tlbr[:2]
+        cropped_boxes.add_offset(-offset)
+        cropped_boxes.normalise(self.target_shape, self.target_shape)
+        valid_boxes = cropped_boxes.box_area() > 0
+        cropped_boxes = cropped_boxes.boolean_mask(valid_boxes)
+        cropped_labels = tf.boolean_mask(labels, valid_boxes)
+        return cropped_boxes, cropped_labels
 
     def _crop_tlbr_box(self, image):
         image_dims = ImageBasicPreparation._image_hw(image)
@@ -69,24 +53,26 @@ class ImageBasicPreparation:
         top = tf.random.uniform([1], minval=0, maxval=can_choose[0], dtype=tf.int32)
         left = tf.random.uniform([1], minval=0, maxval=can_choose[1], dtype=tf.int32)
         tl = tf.concat([top, left], axis=0)
-        return tf.concat([tl, tl + self.target_shape], axis=0)
+        crop_box = tf.concat([tl, tl + self.target_shape], axis=0)
+        return crop_box
 
     def _pad_to_target_if_needed(self, image, bbox):
-        to_pad, bbox_offset = self._calc_padding(image)
-        image = tf.pad(image, to_pad)
-        bbox = bbox + bbox_offset
-        return image, bbox
-
-    def _calc_padding(self, image):
-        image_dims = ImageBasicPreparation._image_hw(image)
-        to_pad = tf.maximum(self.target_shape - image_dims, 0)
+        image_dims_original = ImageBasicPreparation._image_hw(image)
+        to_pad = tf.maximum(self.target_shape - image_dims_original, 0)
         to_pad = tf.concat([to_pad, tf.constant([0])], axis=0)
         to_pad_0 = to_pad // 2
         to_pad_1 = to_pad - to_pad_0
-
-        bbox_offset = tf.concat([to_pad_0[:2], to_pad_0[:2]], axis=0)
         to_pad = tf.stack([to_pad_0, to_pad_1], axis=-1)
-        return to_pad, bbox_offset[None]
+        image = tf.pad(image, to_pad)
+
+        # need to incorporate the padding for the boxes
+        boxes = TLBRBoxes(bbox)
+        boxes.unnormalise(image_dims_original[0], image_dims_original[1])
+        to_pad_0 = tf.cast(to_pad_0[:2], tf.float32)
+        boxes.add_offset(to_pad_0)
+        image_dims_new = ImageBasicPreparation._image_hw(image)
+        boxes.normalise(image_dims_new[0], image_dims_new[1])
+        return image, boxes.tensor
 
     @staticmethod
     def _image_hw(image):
