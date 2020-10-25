@@ -6,14 +6,14 @@ from efficient_det.geometry.common import level_to_stride, pixel_coordinates
 
 
 class SingleAnchorConfig:
-    def __init__(self, size, aspects):
+    def __init__(self, size, aspect):
         self.size = size
-        self.aspects = aspects
+        self.aspect = aspect
 
     def box_size(self, level):
         stride = level_to_stride(level)
         unit_aspect = stride * self.size
-        return unit_aspect*self.aspects
+        return unit_aspect*self.aspect
 
 
 class AnchorsAtLevel:
@@ -27,7 +27,7 @@ class AnchorsAtLevel:
         max_iou = tf.reduce_max(ious, axis=-1)
         best_box = tf.argmax(ious, axis=-1)
         best_box = boxes.create_box_tensor_from_indices(best_box)
-        return max_iou, TLBRBoxes(best_box)
+        return TLBRBoxes(best_box), max_iou
 
     def to_tlbr_tensor(self, default_box_offsets: tf.Tensor):
         """regression should be height, width, n_anchors, 4"""
@@ -38,11 +38,11 @@ class AnchorsAtLevel:
         return tlbr_boxes
 
     def to_offset_tensor(self, boxes: TLBRBoxes, image_height: int, image_width: int):
-        ious, best_box = self.match_boxes(boxes, image_height, image_width)
+        best_box, ious = self.match_boxes(boxes, image_height, image_width)
         anchors = self._build_anchors(image_height, image_width)
         centroid_boxes = best_box.as_centroid_and_width_box()
         offset = centroid_boxes.as_offset_boxes(anchors, as_original_shape=True)
-        return offset
+        return offset, ious
 
     def _build_anchors(self, image_height, image_width):
         anchor_tensors = tf.stack([a.build_anchors(image_height, image_width).get_tensor() for a in self.anchor_builders], axis=-1)
@@ -86,6 +86,22 @@ class SingleAnchorAtLevelBuilder:
         box_shape = self.config.box_size(self.level)
         normalised_box_shape = box_shape / tf.constant([image_height, image_width])
         return normalised_box_shape[0], normalised_box_shape[1]
+
+
+class Anchors:
+    def __init__(self, num_levels, configs):
+        self.num_levels = num_levels
+        self.configs = configs
+        self.anchors = self._build_anchors_at_level()
+
+    def to_tlbr_tensor(self, default_box_offsets: tf.Tensor):
+        return [a.to_tlbr_tensor(default_box_offsets) for a in self.anchors]
+
+    def to_offset_tensor(self, boxes: TLBRBoxes, image_height: int, image_width: int):
+        return [a.to_offset_tensor(boxes, image_height, image_width) for a in self.anchors]
+
+    def _build_anchors_at_level(self):
+        return [AnchorsAtLevel(level, self.configs) for level in range(self.num_levels)]
 
 
 class EfficientDetAnchors:
