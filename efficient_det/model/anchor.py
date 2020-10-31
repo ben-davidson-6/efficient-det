@@ -31,9 +31,9 @@ class AnchorsAtLevel:
     def to_tlbr_tensor(self, default_box_offsets: tf.Tensor):
         """regression should be height, width, n_anchors, 4"""
         image_height, image_width = self._original_image_size_from_default_offsets(default_box_offsets)
-        anchors = self._build_anchors(image_height, image_width)
         offsets = DefaultAnchorOffsets(default_box_offsets)
-        centroid_widths = offsets.as_centroid_width_box(anchors)
+        anchors = self._build_anchors(image_height, image_width)
+        centroid_widths = offsets.as_centroid_width_box(anchors.as_centroid_and_width_box())
         return centroid_widths.as_tlbr_box().as_original_shape()
 
     def to_offset_tensor(self, boxes: TLBRBoxes, image_height: int, image_width: int):
