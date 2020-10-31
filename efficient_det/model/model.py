@@ -57,8 +57,7 @@ class PostProcessor:
 
     def process_output(self, model_out):
         flat_tlbr, flat_label, flat_score = self.model_out_to_flat_tlbr_label_score(model_out)
-        # unique, idx = tf.unique(flat_label)
-        # print(flat_score)
+        # unique, idx = tf.unique(flat_label[0])
         # box_indices = tf.image.non_max_suppression(flat_tlbr, flat_score, 50)
         # tlbr = tf.gather(flat_tlbr, box_indices)
         # label = tf.gather(flat_label, box_indices)
@@ -126,8 +125,8 @@ class InferenceEfficientNet:
         boxes, label, score = self.post_processor.process_output(model_out)
         return boxes, label, score
 
-    def process_output(self, model_out):
-        return self.post_processor.process_output(model_out)
+    def process_ground_truth(self, y_true):
+        return self.post_processor.ground_truth_to_flat_tlbr_label(y_true)
 
 
 if __name__ == '__main__':
@@ -157,7 +156,7 @@ if __name__ == '__main__':
     phi = 0
     num_classes = 80
     efficient_det = model.EfficientDetNetwork(phi, num_classes, anchors)
-    efficient_det.load_weights('C:\\Users\\bne\\PycharmProjects\\efficient-det\\artifacts\\models\\Oct_31_102050\\model')
+    efficient_det.load_weights('C:\\Users\\bne\\PycharmProjects\\efficient-det\\artifacts\\models\\Oct_31_122004\\model')
 
     inference_model = InferenceEfficientNet(efficient_det)
     for x, y in dataset.validation_set():

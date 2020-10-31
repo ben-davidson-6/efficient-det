@@ -3,6 +3,7 @@ import pathlib
 
 from efficient_det.geometry.plot import draw_model_output
 from efficient_det.model.model import InferenceEfficientNet
+from efficient_det import NO_CLASS_LABEL
 
 
 class TensorboardCallback(tf.keras.callbacks.Callback):
@@ -53,7 +54,9 @@ class TensorboardCallback(tf.keras.callbacks.Callback):
             if with_model:
                 box, label, score = self.get_net()(image, training=False)
             else:
-                box, label, score = self.get_net().process_output(offset)
+                box, label = self.get_net().process_ground_truth(offset)
+                score = tf.ones_like(label, dtype=tf.float32)
+                box = tf.where(label[..., None] == NO_CLASS_LABEL, box, -1.)
             image = draw_model_output(image, box, score, thresh)
             image = tf.image.resize(image, (TensorboardCallback.IMAGE_SIZE, TensorboardCallback.IMAGE_SIZE))
             validation.append(image[0])
@@ -67,7 +70,10 @@ class TensorboardCallback(tf.keras.callbacks.Callback):
                 box, label, score = self.get_net()(image, training=False)
             else:
                 offset = [x[i:i+1] for x in self.training_examples[1]]
-                box, label, score = self.get_net().process_output(offset)
+                box, label = self.get_net().process_ground_truth(offset)
+                score = tf.ones_like(label, dtype=tf.float32)
+                box = tf.where(label[..., None] == NO_CLASS_LABEL, box, -1.)
+
             image = draw_model_output(image, box, score, thresh)
             image = tf.image.resize(image, (TensorboardCallback.IMAGE_SIZE, TensorboardCallback.IMAGE_SIZE))
             training.append(image[0])

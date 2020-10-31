@@ -57,8 +57,7 @@ class Dataset:
             offsets, ious, matched_boxes = zip(*offsets_ious_boxes)
             labels = [tf.gather(tf.cast(labels, tf.float32), box) for box in matched_boxes]
             ious = [x > self.iou_thresh for x in ious]
-            # note here we add 1 so that the background class is zero!
-            labels = [tf.where(iou, label, efficient_det.NO_CLASS_LABEL) + 1 for iou, label in zip(ious, labels)]
+            labels = [tf.where(iou, label, efficient_det.NO_CLASS_LABEL) for iou, label in zip(ious, labels)]
             offset = tuple([tf.concat([label[..., None], offset], axis=-1) for label, offset in zip(labels, offsets)])
         return image, offset
 

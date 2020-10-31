@@ -1,15 +1,16 @@
 import tensorflow as tf
+import math
 
 
 class DetectionHead(tf.keras.layers.Layer):
-    def __init__(self, num_class, num_anchors_per_pixel, repeats, dropout_rate=0.2, depth=32):
+    def __init__(self, num_class, num_anchors, repeats, dropout_rate=0.2, depth=32):
         super(DetectionHead, self).__init__()
-        self.num_classifications = num_class * num_anchors_per_pixel
-        self.num_anchors = num_anchors_per_pixel
-        self.num_anchor_regressions = num_anchors_per_pixel * 4
+        self.num_classifications = num_class * num_anchors
+        self.num_anchors = num_anchors
+        self.num_anchor_regressions = num_anchors * 4
         self.fully_connected_head = FullyConnectedHead(
-            self.num_classifications,
-            self.num_anchor_regressions,
+            num_class,
+            num_anchors,
             repeats,
             dropout_rate,
             depth)
@@ -36,17 +37,18 @@ class DetectionHead(tf.keras.layers.Layer):
 
 class FullyConnectedHead(tf.keras.layers.Layer):
 
-    def __init__(self, num_classifications, num_regressions, repeats, dropout_rate, depth):
+    def __init__(self, num_class, num_anchors, repeats, dropout_rate, depth):
         super(FullyConnectedHead, self).__init__()
         self.repeats = repeats
         self.depth = depth
         self.convs = [self.seperable_conv_layer() for _ in range(self.repeats)]
         self.dropout = tf.keras.layers.Dropout(rate=dropout_rate)
+        number_out = num_anchors*(num_class + 4)
         self.classification_layer = tf.keras.layers.Conv2D(
-            filters=num_classifications + num_regressions,
+            filters=number_out,
             kernel_size=1,
             use_bias=True,
-            bias_initializer=DetectionBiasInitialiser(num_classifications, num_regressions),
+            bias_initializer=DetectionBiasInitialiser(num_class, num_anchors),
             dtype=tf.float32)
 
     def call(self, inputs, training=None):
@@ -76,14 +78,16 @@ class FullyConnectedHead(tf.keras.layers.Layer):
 class DetectionBiasInitialiser(tf.initializers.Initializer):
     PRIOR_FOREGROUND = 0.01
 
-    def __init__(self, num_classifications, num_regressions):
-        self.num_classifications = num_classifications
-        self.num_regressions = num_regressions
+    def __init__(self, num_class, num_anchor):
+        self.initialisation = []
+        pi = DetectionBiasInitialiser.PRIOR_FOREGROUND
+        prior = -math.log((1 - pi) / pi)
+        for anchor in range(num_anchor):
+            for c in range(num_class):
+                self.initialisation.append(prior)
+        self.initialisation += [0. for _ in range(num_anchor*4)]
+        self.initialisation = tf.constant(self.initialisation, dtype=tf.float32)
 
     def __call__(self, shape, dtype=None):
-        class_bias = tf.ones([self.num_classifications])
-        pi = DetectionBiasInitialiser.PRIOR_FOREGROUND
-        class_bias *= -tf.math.log((1 - pi) / pi)
-        bias_initialiser = tf.concat([class_bias, tf.zeros([self.num_regressions])], axis=0)
-        return bias_initialiser
+        return self.initialisation
 

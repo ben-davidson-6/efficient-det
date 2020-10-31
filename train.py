@@ -26,31 +26,37 @@ import datetime
 
 # anchors
 anchor_size = 4
-aspects = [
+base_aspects = [
     (1., 1.),
     (.75, 1.5),
     (1.5, 0.75),
 ]
+aspects = []
+for octave in range(3):
+    scale = 2**(octave/3)
+    for aspect in base_aspects:
+        aspects.append((aspect[0]*scale, aspect[1]*scale))
+
 num_levels = 6
 anchors = model.build_anchors(anchor_size, num_levels=num_levels, aspects=aspects)
 
 # network
 phi = 0
-num_classes = 80 + 1
+num_classes = 80
 efficient_det = model.EfficientDetNetwork(phi, num_classes, anchors)
 
 # loss
-loss_weights = tf.constant([1., 99.])
-alpha = 0.25
+loss_weights = tf.constant([1., 50.])
 gamma = 2.0
 delta = 0.1
+alpha = 0.25
 class_loss = model.FocalLoss(alpha, gamma, num_classes)
 box_loss = model.BoxRegressionLoss(delta)
 loss = model.EfficientDetLoss(class_loss, box_loss, loss_weights, num_classes)
 
 # dataset
 prepper = train_data_prep.ImageBasicPreparation(min_scale=0.8, max_scale=1.2, target_shape=512)
-iou_match_thresh = 0.3
+iou_match_thresh = 0.5
 dataset = coco.Coco(
     anchors=anchors,
     augmentations=None,
@@ -74,10 +80,10 @@ save_model = tf.keras.callbacks.ModelCheckpoint(
 tensorboard_vis = model.TensorboardCallback(dataset.training_set(), dataset.validation_set(), f'./artifacts/logs/{time}')
 cbs = [save_model, tensorboard_vis]
 efficient_det.fit(
-    dataset.training_set(),
-    validation_data=dataset.validation_set(),
-    # steps_per_epoch=2000,
-    # validation_steps=500,
+    dataset.training_set().repeat(),
+    validation_data=dataset.validation_set().repeat(),
+    steps_per_epoch=1000,
+    validation_steps=10,
     epochs=999999,
     callbacks=cbs
 )
