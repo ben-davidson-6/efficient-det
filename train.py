@@ -82,8 +82,8 @@ cbs = [save_model, tensorboard_vis]
 efficient_det.fit(
     dataset.training_set().repeat(),
     validation_data=dataset.validation_set().repeat(),
-    steps_per_epoch=1000,
-    validation_steps=10,
+    steps_per_epoch=5000,
+    validation_steps=1000,
     epochs=999999,
     callbacks=cbs
 )

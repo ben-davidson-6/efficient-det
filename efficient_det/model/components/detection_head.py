@@ -23,13 +23,6 @@ class DetectionHead(tf.keras.layers.Layer):
             outputs.append(self._reshape_predictions_to_each_anchor(output))
         return outputs
 
-    def _reshape_output(self, output):
-        classifications = output[..., :self.num_classifications]
-        regressions = output[..., self.num_classifications:]
-        regressions = self._reshape_predictions_to_each_anchor(regressions)
-        classifications = self._reshape_predictions_to_each_anchor(classifications)
-        return classifications, regressions
-
     def _reshape_predictions_to_each_anchor(self, tensor):
         """takes tensor with final dimension self.num_anchors*x -> self.num_anchors, x"""
         return tf.stack(tf.split(tensor, num_or_size_splits=self.num_anchors, axis=-1), axis=-2)
@@ -85,7 +78,7 @@ class DetectionBiasInitialiser(tf.initializers.Initializer):
         for anchor in range(num_anchor):
             for c in range(num_class):
                 self.initialisation.append(prior)
-        self.initialisation += [0. for _ in range(num_anchor*4)]
+            self.initialisation += [0. for _ in range(4)]
         self.initialisation = tf.constant(self.initialisation, dtype=tf.float32)
 
     def __call__(self, shape, dtype=None):

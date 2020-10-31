@@ -14,7 +14,7 @@ class ClassAccuracy(tf.keras.metrics.Metric):
 
     def update_state(self, y_true, y_pred, sample_weight=None):
         y_true = tf.cast(y_true[..., 0], tf.int32)
-        y_pred = tf.nn.sigmoid(y_pred)
+        y_pred = tf.nn.sigmoid(y_pred[..., :self.num_classes])
         actual_classes = y_true != NO_CLASS_LABEL
         y_true = tf.boolean_mask(y_true, actual_classes)
         y_pred = tf.boolean_mask(y_pred, actual_classes)

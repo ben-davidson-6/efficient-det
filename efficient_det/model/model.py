@@ -135,14 +135,18 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
     from efficient_det.geometry.plot import draw_model_output
 
-
-    # anchors
     anchor_size = 4
-    aspects = [
+    base_aspects = [
         (1., 1.),
         (.75, 1.5),
         (1.5, 0.75),
     ]
+    aspects = []
+    for octave in range(3):
+        scale = 2 ** (octave / 3)
+        for aspect in base_aspects:
+            aspects.append((aspect[0] * scale, aspect[1] * scale))
+
     anchors = model.build_anchors(anchor_size, num_levels=6, aspects=aspects)
 
     dataset = coco.Coco(
@@ -156,7 +160,7 @@ if __name__ == '__main__':
     phi = 0
     num_classes = 80
     efficient_det = model.EfficientDetNetwork(phi, num_classes, anchors)
-    efficient_det.load_weights('C:\\Users\\bne\\PycharmProjects\\efficient-det\\artifacts\\models\\Oct_31_122004\\model')
+    # efficient_det.load_weights('C:\\Users\\bne\\PycharmProjects\\efficient-det\\artifacts\\models\\Oct_31_193800\\model')
 
     inference_model = InferenceEfficientNet(efficient_det)
     for x, y in dataset.validation_set():
