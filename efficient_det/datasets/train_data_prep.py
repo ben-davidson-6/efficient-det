@@ -10,7 +10,6 @@ class ImageBasicPreparation:
         self.max_scale = max_scale
         self.target_shape = target_shape
 
-    @tf.function
     def scale_and_random_crop(self, image, bbox, labels):
         """bboxes must be unnormalised!"""
         image = self._random_scale_image(image)

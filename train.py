@@ -2,6 +2,7 @@ import os
 os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 os.environ['PATH'] += ';C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v10.1\\extras\\CUPTI\\lib64'
 os.environ['TF_GPU_THREAD_MODE'] = 'gpu_private'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 import efficient_det.model as model
 import efficient_det.datasets.coco as coco
@@ -13,13 +14,15 @@ import datetime
 #   deal with the image shape requirements better
 #       need to have a way of forcing the shapes to be the same for down and up sampling
 #   add better training metrics
-#       iou
+#       ap
+#       per class accuracy/dice/conf
 #   add some seeding functionality to reproduce
 #   add augmentations
 #   move to conda and setup environment
 #   inference
 #       non maximal suppresion
 #   the number of levels is a bit esoteric for the anchors
+#       it has to match up with the downampling of the model
 
 # anchors
 anchor_size = 4
@@ -28,16 +31,17 @@ aspects = [
     (.75, 1.5),
     (1.5, 0.75),
 ]
-anchors = model.build_anchors(anchor_size, num_levels=6, aspects=aspects)
+num_levels = 6
+anchors = model.build_anchors(anchor_size, num_levels=num_levels, aspects=aspects)
 
 # network
 phi = 0
-num_classes = 80
+num_classes = 80 + 1
 efficient_det = model.EfficientDetNetwork(phi, num_classes, anchors)
 
 # loss
 loss_weights = tf.constant([1., 99.])
-alpha = 0.9
+alpha = 0.25
 gamma = 2.0
 delta = 0.1
 class_loss = model.FocalLoss(alpha, gamma, num_classes)
@@ -56,8 +60,9 @@ dataset = coco.Coco(
 
 # training loop
 time = datetime.datetime.utcnow().strftime('%h_%d_%H%M%S')
-adam = tf.keras.optimizers.Adam(learning_rate=0.0001)
-efficient_det.compile(optimizer=adam, loss=loss)
+adam = tf.keras.optimizers.Adam(learning_rate=0.001)
+metrics = [model.ClassAccuracy(num_classes, anchors)]
+efficient_det.compile(optimizer=adam, loss=loss, metrics=metrics)
 save_model = tf.keras.callbacks.ModelCheckpoint(
     f'./artifacts/models/{time}/model',
     monitor='val_loss',
@@ -69,10 +74,10 @@ save_model = tf.keras.callbacks.ModelCheckpoint(
 tensorboard_vis = model.TensorboardCallback(dataset.training_set(), dataset.validation_set(), f'./artifacts/logs/{time}')
 cbs = [save_model, tensorboard_vis]
 efficient_det.fit(
-    dataset.training_set().repeat(),
-    validation_data=dataset.validation_set().repeat(),
-    steps_per_epoch=2000,
-    validation_steps=500,
+    dataset.training_set(),
+    validation_data=dataset.validation_set(),
+    # steps_per_epoch=2000,
+    # validation_steps=500,
     epochs=999999,
     callbacks=cbs
 )

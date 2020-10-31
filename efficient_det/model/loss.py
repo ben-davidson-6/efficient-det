@@ -1,7 +1,6 @@
 import tensorflow as tf
 
-from efficient_det import NO_CLASS_LABEL
-# todo normalise by box size
+from efficient_det import BACKGROUND_CLASS, NO_CLASS_LABEL
 
 
 class EfficientDetLoss(tf.keras.losses.Loss):
@@ -31,17 +30,17 @@ class EfficientDetLoss(tf.keras.losses.Loss):
         y_true_class, y_true_regression = tf.cast(y_true[..., 0], tf.int32), y_true[..., 1:]
         y_pred_class, y_pred_regression = y_pred[..., :self.n_classes], y_pred[..., self.n_classes:]
         y_pred_class = tf.nn.sigmoid(y_pred_class)
-        fl = self.focal_loss(y_true_class, y_pred_class) * self.weights[0]
+        non_background, num_positive_per_image = self._calculate_mask_and_normaliser(y_true)
 
-        non_background = self._calculate_mask_and_normaliser(y_true)
-        bl = self.box_loss(y_true_regression, y_pred_regression, non_background) * self.weights[1]
+        fl = self.focal_loss(y_true_class, y_pred_class)*self.weights[0]/num_positive_per_image
+        bl = self.box_loss(y_true_regression, y_pred_regression, 4*non_background/num_positive_per_image)*self.weights[1]
         return fl + bl
 
     def _calculate_mask_and_normaliser(self, y_true_class):
-        non_background = tf.cast(y_true_class != NO_CLASS_LABEL, tf.float32)
-        num_positive_per_image = tf.reduce_sum(non_background, [1, 2, 3], keepdims=True)
-        non_background = non_background/tf.maximum(num_positive_per_image, 1)
-        return non_background
+        non_background_and_has_class = tf.logical_and(y_true_class != NO_CLASS_LABEL, y_true_class != BACKGROUND_CLASS)
+        non_background_and_has_class = tf.cast(non_background_and_has_class, tf.float32)
+        num_positive_per_image = tf.maximum(tf.reduce_sum(non_background_and_has_class, [1, 2, 3], keepdims=True), 1.)
+        return non_background_and_has_class, num_positive_per_image
 
 
 class FocalLoss(tf.keras.losses.Loss):

@@ -27,21 +27,27 @@ class Dataset:
 
     def training_set(self):
         ds = self._raw_training_set()
-        ds = ds.map(self.basic_training_prep.scale_and_random_crop, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-        ds = ds.map(self._build_offset_boxes, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+        ds = ds.map(self.training_transform, num_parallel_calls=tf.data.experimental.AUTOTUNE)
         ds = ds.batch(self.batch_size).prefetch(tf.data.experimental.AUTOTUNE)
-        ds = ds.map(self.augmentations, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+        # ds = ds.map(self.augmentations, num_parallel_calls=tf.data.experimental.AUTOTUNE)
         return ds
+
+    @tf.function
+    def training_transform(self, *args):
+        return self._build_offset_boxes(*self.basic_training_prep.scale_and_random_crop(*args))
 
     def validation_set(self):
         ds = self._raw_validation_set()
-        ds = ds.map(self._closest_acceptable_multiple)
-        ds = ds.map(self._build_offset_boxes, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+        ds = ds.map(self.validation_transform, num_parallel_calls=tf.data.experimental.AUTOTUNE)
         ds = ds.batch(1).prefetch(tf.data.experimental.AUTOTUNE)
         return ds
 
+    @tf.function
+    def validation_transform(self, *args):
+        return self._build_offset_boxes(*self._closest_acceptable_multiple(*args))
+
     def _build_offset_boxes(self, image, bboxes, labels):
-        """regressions is  a single tensor with final dim = 5 = class + regression"""
+        """offset is  a single tensor with final dim = 5 = class + regression"""
         height, width, channel = image.shape
         bboxes = TLBRBoxes(bboxes)
         if bboxes.is_empty():
@@ -51,7 +57,8 @@ class Dataset:
             offsets, ious, matched_boxes = zip(*offsets_ious_boxes)
             labels = [tf.gather(tf.cast(labels, tf.float32), box) for box in matched_boxes]
             ious = [x > self.iou_thresh for x in ious]
-            labels = [tf.where(iou, label, efficient_det.NO_CLASS_LABEL) for iou, label in zip(ious, labels)]
+            # note here we add 1 so that the background class is zero!
+            labels = [tf.where(iou, label, efficient_det.NO_CLASS_LABEL) + 1 for iou, label in zip(ious, labels)]
             offset = tuple([tf.concat([label[..., None], offset], axis=-1) for label, offset in zip(labels, offsets)])
         return image, offset
 
