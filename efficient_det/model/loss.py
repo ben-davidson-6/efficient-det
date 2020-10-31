@@ -31,6 +31,9 @@ class EfficientDetLoss(tf.keras.losses.Loss):
         y_pred_class, y_pred_regression = y_pred[..., :self.n_classes], y_pred[..., self.n_classes:]
         y_pred_class = tf.nn.sigmoid(y_pred_class)
         # tf.print(tf.reduce_mean(y_pred_class, [0, 1, 2, 3]))
+        # tf.print(tf.reduce_mean(tf.reshape(y_pred_regression, [-1, 4]), axis=0), end='est\n')
+        # tf.print(tf.reduce_mean(tf.reshape(y_true_regression, [-1, 4]), axis=0), end='true\n')
+        # tf.print(tf.reduce_mean(tf.reshape(y_pred_class, [-1, self.n_classes]), axis=0), end='est_probs\n')
         non_background, num_positive_per_image = self._calculate_mask_and_normaliser(y_true)
 
         fl = self.focal_loss(y_true_class, y_pred_class)*self.weights[0]/num_positive_per_image

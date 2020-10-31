@@ -108,10 +108,10 @@ class CentroidWidthBoxes(Boxes):
         return TLBRBoxes(tf.concat([ymin, xmin, ymax, xmax], axis=-1), self.original_shape)
 
     def as_offset_boxes(self, other, as_original_shape=False):
-        centroid_self, dimension_self = tf.split(other.tensor, num_or_size_splits=2, axis=-1)
-        centroid_other, dimensions_other = tf.split(self.tensor, num_or_size_splits=2, axis=-1)
-        offset = centroid_other - centroid_self
-        scale = tf.math.log(dimensions_other / dimension_self)
+        centroid_other, dimensions_other = tf.split(other.tensor, num_or_size_splits=2, axis=-1)
+        centroid_self, dimensions_self = tf.split(self.tensor, num_or_size_splits=2, axis=-1)
+        offset = (centroid_self - centroid_other)/dimensions_other
+        scale = tf.math.log(dimensions_self/dimensions_other)
         offset_boxes = tf.concat([offset, scale], axis=-1)
         if as_original_shape:
             offset_boxes = tf.reshape(offset_boxes, self.original_shape)
@@ -137,8 +137,7 @@ class DefaultAnchorOffsets(Boxes):
         centroid_offset, dimension_scale = tf.split(self.tensor, num_or_size_splits=2, axis=-1)
         centroid, dimension = tf.split(anchors.tensor, num_or_size_splits=2, axis=-1)
         width_height_scale = tf.exp(dimension_scale)
-
         scaled_dimensions = dimension*width_height_scale
-        offset_centroids = centroid + centroid_offset
+        offset_centroids = centroid + centroid_offset*dimension
         offset_anchors = tf.concat([offset_centroids, scaled_dimensions], axis=-1)
         return CentroidWidthBoxes(offset_anchors, self.original_shape)

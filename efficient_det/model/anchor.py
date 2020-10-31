@@ -38,8 +38,8 @@ class AnchorsAtLevel:
 
     def to_offset_tensor(self, boxes: TLBRBoxes, image_height: int, image_width: int):
         box_coordinates, ious, best_box = self.match_boxes(boxes, image_height, image_width)
-        anchors = self._build_anchors(image_height, image_width)
         centroid_boxes = box_coordinates.as_centroid_and_width_box()
+        anchors = self._build_anchors(image_height, image_width).as_centroid_and_width_box()
         offset = centroid_boxes.as_offset_boxes(anchors, as_original_shape=True)
         return offset, ious, best_box
 
