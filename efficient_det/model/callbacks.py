@@ -7,7 +7,7 @@ from efficient_det import NO_CLASS_LABEL
 
 
 class TensorboardCallback(tf.keras.callbacks.Callback):
-    MAX_EXAMPLES_PER_DATASET = 1
+    MAX_EXAMPLES_PER_DATASET = 4
     VALIDATION_NAME = 'val'
     TRAINING_NAME = 'train'
     IMAGE_SIZE = 256

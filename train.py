@@ -49,7 +49,7 @@ efficient_det = model.EfficientDetNetwork(phi, num_classes, anchors)
 loss_weights = tf.constant([1., 1.])
 gamma = 2.0
 delta = 0.1
-alpha = 0.75
+alpha = 0.25
 class_loss = model.FocalLoss(alpha, gamma, num_classes)
 box_loss = model.BoxRegressionLoss(delta)
 loss = model.EfficientDetLoss(class_loss, box_loss, loss_weights, num_classes)
@@ -62,7 +62,7 @@ dataset = coco.Coco(
     augmentations=None,
     basic_training_prep=prepper,
     iou_thresh=iou_match_thresh,
-    batch_size=1)
+    batch_size=16)
 
 # training loop
 time = datetime.datetime.utcnow().strftime('%h_%d_%H%M%S')
@@ -79,13 +79,12 @@ save_model = tf.keras.callbacks.ModelCheckpoint(
     save_freq='epoch')
 
 
-train_ds = dataset.validation_set().take(1)
-tensorboard_vis = model.TensorboardCallback(train_ds, train_ds, f'./artifacts/logs/{time}')
+tensorboard_vis = model.TensorboardCallback(dataset.training_set(), dataset.validation_set(), f'./artifacts/logs/{time}')
 cbs = [tensorboard_vis]
 efficient_det.fit(
-    train_ds,
+    dataset.training_set().repeat(),
     # validation_data=dataset.validation_set().repeat(),
-    steps_per_epoch=1,
+    steps_per_epoch=500,
     # validation_steps=1000,
     epochs=999999,
     callbacks=cbs
