@@ -5,9 +5,7 @@ from efficient_det import NO_CLASS_LABEL
 
 
 class ClassAccuracy(tf.keras.metrics.Metric):
-    def __init__(self, num_classes, anchors):
-        self.anchors = anchors
-        self.post_processor = PostProcessor(anchors)
+    def __init__(self, num_classes):
         self.acc = tf.keras.metrics.CategoricalAccuracy()
         self.num_classes = num_classes
         super(ClassAccuracy, self).__init__(name='class_accuracy')
@@ -18,6 +16,13 @@ class ClassAccuracy(tf.keras.metrics.Metric):
         actual_classes = y_true != NO_CLASS_LABEL
         y_true = tf.boolean_mask(y_true, actual_classes)
         y_pred = tf.boolean_mask(y_pred, actual_classes)
+
+        # to_print = tf.stack([
+        #     tf.cast(y_true, tf.float32),
+        #     tf.cast(tf.argmax(y_pred, axis=-1), tf.float32),
+        #     tf.reduce_max(y_pred, axis=-1)], axis=1)[:30]
+        # tf.print(to_print, end='metric\n', summarize=-1)
+
         gt = tf.one_hot(y_true, depth=self.num_classes)
         self.acc.update_state(gt, y_pred)
 
@@ -28,7 +33,7 @@ class ClassAccuracy(tf.keras.metrics.Metric):
         return self.acc.result()
 
     def get_config(self):
-        return {'num_classes': self.num_classes, 'anchors': self.anchors}
+        return {'num_classes': self.num_classes}
 
 
 class APAt(tf.keras.metrics.Metric):

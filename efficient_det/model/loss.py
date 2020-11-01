@@ -29,14 +29,13 @@ class EfficientDetLoss(tf.keras.losses.Loss):
         """
         y_true_class, y_true_regression = tf.cast(y_true[..., 0], tf.int32), y_true[..., 1:]
         y_pred_class, y_pred_regression = y_pred[..., :self.n_classes], y_pred[..., self.n_classes:]
-        y_pred_class = tf.nn.sigmoid(y_pred_class)
         # tf.print(tf.reduce_mean(y_pred_class, [0, 1, 2, 3]))
         # tf.print(tf.reduce_mean(tf.reshape(y_pred_regression, [-1, 4]), axis=0), end='est\n')
         # tf.print(tf.reduce_mean(tf.reshape(y_true_regression, [-1, 4]), axis=0), end='true\n')
         # tf.print(tf.reduce_mean(tf.reshape(y_pred_class, [-1, self.n_classes]), axis=0), end='est_probs\n')
         non_background, num_positive_per_image = self._calculate_mask_and_normaliser(y_true)
 
-        fl = self.focal_loss(y_true_class, y_pred_class)*self.weights[0]/num_positive_per_image
+        fl = self.focal_loss(y_true_class, y_pred_class)*self.weights[0]
         bl = self.box_loss(y_true_regression, y_pred_regression, 4*non_background/num_positive_per_image)*self.weights[1]
         return fl + bl
 
@@ -61,13 +60,14 @@ class FocalLoss(tf.keras.losses.Loss):
         return y_true, y_pred
 
     def call(self, y_true, y_pred, sample_weight=None):
-        y_true, y_pred = self._prep_inputs(y_true, y_pred)
+        y_pred_probs = tf.nn.sigmoid(y_pred)
+        y_true, y_pred_probs = self._prep_inputs(y_true, y_pred_probs)
         is_on = y_true == 1
-        p_t = tf.where(is_on, y_pred, 1 - y_pred)
+        p_t = tf.where(is_on, y_pred_probs, 1 - y_pred_probs)
         alpha_factor = tf.ones_like(y_true) * self.alpha
         alpha_t = tf.where(is_on, alpha_factor, 1 - alpha_factor)
-        weight = alpha_t * (1 - p_t) ** self.gamma
-        ce = -tf.math.log(p_t)
+        weight = alpha_t * (1 - p_t)**self.gamma
+        ce = tf.nn.sigmoid_cross_entropy_with_logits(labels=y_true, logits=y_pred)
         return ce*weight
 
 

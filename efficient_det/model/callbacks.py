@@ -7,7 +7,7 @@ from efficient_det import NO_CLASS_LABEL
 
 
 class TensorboardCallback(tf.keras.callbacks.Callback):
-    MAX_EXAMPLES_PER_DATASET = 4
+    MAX_EXAMPLES_PER_DATASET = 1
     VALIDATION_NAME = 'val'
     TRAINING_NAME = 'train'
     IMAGE_SIZE = 256
@@ -103,10 +103,20 @@ class TensorboardCallback(tf.keras.callbacks.Callback):
 
     def _write_image_summaries(self, epoch):
         validation, training = self._build_summary_image()
+        val_hists, training_hists = self._build_histograms()
         with self.validation_writer.as_default():
+            offsets, classes, scores, gt_labels = val_hists
             tf.summary.image('examples', validation, step=epoch)
+            tf.summary.histogram('classes', classes, step=epoch)
+            tf.summary.histogram('offsets', offsets, step=epoch)
+            tf.summary.histogram('scores', scores, step=epoch)
+            tf.summary.histogram('gt', gt_labels, step=epoch)
         with self.training_writer.as_default():
+            offsets, classes, scores = training_hists
             tf.summary.image('examples', training, step=epoch)
+            tf.summary.histogram('classes', classes, step=epoch)
+            tf.summary.histogram('offsets', offsets, step=epoch)
+            tf.summary.histogram('scores', scores, step=epoch)
 
     def write_metric_stats(self, logs):
         with self.validation_writer.as_default():
@@ -136,6 +146,23 @@ class TensorboardCallback(tf.keras.callbacks.Callback):
         validation = tf.concat([validation_gt, validation_image], axis=0)
         training = tf.concat([training_gt, training_image], axis=0)
         return validation[None], training[None]
+
+    def _build_histograms(self):
+        train_hists = []
+        for i in range(TensorboardCallback.MAX_EXAMPLES_PER_DATASET):
+            image = self.training_examples[0][i][None]
+            box, label, score = self.get_net()(image, training=False)
+            train_hists.append((box, label, score))
+
+        val_hists = []
+        for image, offset in self.validation_examples:
+            box, label, score = self.get_net()(image, training=False)
+            gt_labels = tf.concat([tf.reshape(o[..., 0], [-1]) for o in offset], axis=0)
+            val_hists.append((box, label, score, gt_labels))
+
+        val_hists = list(map(lambda x: tf.concat(x, axis=0), zip(*val_hists)))
+        train_hists = list(map(lambda x: tf.concat(x, axis=0), zip(*train_hists)))
+        return val_hists, train_hists
 
     @staticmethod
     def _make_file_writer(log_dir, name):

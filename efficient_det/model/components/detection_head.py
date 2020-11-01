@@ -3,7 +3,7 @@ import math
 
 
 class DetectionHead(tf.keras.layers.Layer):
-    def __init__(self, num_class, num_anchors, repeats, dropout_rate=0.2, depth=32):
+    def __init__(self, num_class, num_anchors, repeats, depth=32):
         super(DetectionHead, self).__init__()
         self.num_classifications = num_class * num_anchors
         self.num_anchors = num_anchors
@@ -12,7 +12,6 @@ class DetectionHead(tf.keras.layers.Layer):
             num_class,
             num_anchors,
             repeats,
-            dropout_rate,
             depth)
 
     def call(self, inputs, training=None):
@@ -30,12 +29,11 @@ class DetectionHead(tf.keras.layers.Layer):
 
 class FullyConnectedHead(tf.keras.layers.Layer):
 
-    def __init__(self, num_class, num_anchors, repeats, dropout_rate, depth):
+    def __init__(self, num_class, num_anchors, repeats, depth):
         super(FullyConnectedHead, self).__init__()
         self.repeats = repeats
         self.depth = depth
         self.convs = [self.seperable_conv_layer() for _ in range(self.repeats)]
-        self.dropout = tf.keras.layers.Dropout(rate=dropout_rate)
         number_out = num_anchors*(num_class + 4)
         self.classification_layer = tf.keras.layers.Conv2D(
             filters=number_out,
@@ -61,10 +59,8 @@ class FullyConnectedHead(tf.keras.layers.Layer):
             self.depth,
             kernel_size=3,
             padding='SAME',
-            activation='relu',
-            pointwise_initializer=tf.initializers.VarianceScaling(),
-            depthwise_initializer=tf.initializers.VarianceScaling(),
-            dtype=tf.float32
+            activation='swish',
+            dtype=tf.float32,
         )
 
 

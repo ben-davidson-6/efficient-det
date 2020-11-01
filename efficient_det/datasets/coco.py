@@ -57,8 +57,5 @@ if __name__ == '__main__':
         iou_thresh=iou_match_thresh,
         batch_size=1)
 
-    for example in dataset.raw_dataset('train'):
-        image, box, label = Coco.get_image_box_label(example)
-        out = dataset.basic_training_prep.scale_and_random_crop(image, box, label)
-        ds = dataset._build_offset_boxes(*out)
+    for example in dataset.validation_set():
         break

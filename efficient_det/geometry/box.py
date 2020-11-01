@@ -136,8 +136,8 @@ class DefaultAnchorOffsets(Boxes):
     def as_centroid_width_box(self, anchors: DefaultAnchorBoxes):
         centroid_offset, dimension_scale = tf.split(self.tensor, num_or_size_splits=2, axis=-1)
         centroid, dimension = tf.split(anchors.tensor, num_or_size_splits=2, axis=-1)
-        width_height_scale = tf.exp(dimension_scale)
-        scaled_dimensions = dimension*width_height_scale
+        scale = tf.exp(dimension_scale)
+        scaled_dimensions = dimension*scale
         offset_centroids = centroid + centroid_offset*dimension
         offset_anchors = tf.concat([offset_centroids, scaled_dimensions], axis=-1)
         return CentroidWidthBoxes(offset_anchors, self.original_shape)
