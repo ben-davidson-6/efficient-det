@@ -4,11 +4,11 @@ from efficient_det.model.model import PostProcessor
 from efficient_det import NO_CLASS_LABEL
 
 
-class ClassAccuracy(tf.keras.metrics.Metric):
+class MeanIOU(tf.keras.metrics.Metric):
     def __init__(self, num_classes):
-        self.acc = tf.keras.metrics.CategoricalAccuracy()
+        self.iou = tf.keras.metrics.MeanIoU(num_classes)
         self.num_classes = num_classes
-        super(ClassAccuracy, self).__init__(name='class_accuracy')
+        super(MeanIOU, self).__init__(name='class_accuracy')
 
     def update_state(self, y_true, y_pred, sample_weight=None):
         y_true = tf.cast(y_true[..., 0], tf.int32)
@@ -22,15 +22,14 @@ class ClassAccuracy(tf.keras.metrics.Metric):
         #     tf.cast(tf.argmax(y_pred, axis=-1), tf.float32),
         #     tf.reduce_max(y_pred, axis=-1)], axis=1)[:30]
         # tf.print(to_print, end='metric\n', summarize=-1)
-
-        gt = tf.one_hot(y_true, depth=self.num_classes)
-        self.acc.update_state(gt, y_pred)
+        y_pred = tf.argmax(y_pred, axis=-1)
+        self.iou.update_state(y_true, y_pred)
 
     def reset_states(self):
-        self.acc.reset_states()
+        self.iou.reset_states()
 
     def result(self):
-        return self.acc.result()
+        return self.iou.result()
 
     def get_config(self):
         return {'num_classes': self.num_classes}

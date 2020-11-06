@@ -47,6 +47,7 @@ if __name__ == '__main__':
         (1.5, 0.75),
     ]
     anchors = model.build_anchors(anchor_size, num_levels=6, aspects=aspects)
+    net = model.EfficientDetNetwork(0, 80, anchors)
     # dataset
     prepper = train_data_prep.ImageBasicPreparation(min_scale=0.8, max_scale=1.2, target_shape=512)
     iou_match_thresh = 0.3
@@ -56,6 +57,3 @@ if __name__ == '__main__':
         basic_training_prep=prepper,
         iou_thresh=iou_match_thresh,
         batch_size=1)
-
-    for example in dataset.validation_set():
-        break

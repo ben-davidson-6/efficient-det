@@ -162,9 +162,17 @@ if __name__ == '__main__':
     efficient_det = model.EfficientDetNetwork(phi, num_classes, anchors)
     # efficient_det.load_weights('C:\\Users\\bne\\PycharmProjects\\efficient-det\\artifacts\\models\\Oct_31_193800\\model')
 
-    inference_model = InferenceEfficientNet(efficient_det)
-    for x, y in dataset.validation_set():
-        box, label, score = inference_model(x, training=False)
-        image = draw_model_output(x, box, score, 0.5)
-        plt.imshow(image[0])
-        plt.show()
+    class_act = model.metrics.MeanIOU(80)
+    for image, offset in dataset.validation_set():
+        model_out = efficient_det(image, training=False)
+        for gt, pred in zip(offset, model_out):
+            class_act.update_state(gt, pred)
+        print(class_act.result())
+        break
+
+    # inference_model = InferenceEfficientNet(efficient_det)
+    # for x, y in dataset.validation_set():
+    #     box, label, score = inference_model(x, training=False)
+    #     image = draw_model_output(x, box, score, 0.5)
+    #     plt.imshow(image[0])
+    #     plt.show()

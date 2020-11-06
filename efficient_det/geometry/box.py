@@ -120,7 +120,7 @@ class CentroidWidthBoxes(Boxes):
 
 class DefaultAnchorBoxes(CentroidWidthBoxes):
     def __init__(self, stride_height, stride_width, grid_height, grid_width, box_height, box_width):
-        box_shape = tf.stack([box_height/2, box_width/2])
+        box_shape = tf.stack([box_width/2, box_height/2])
         box_shape = tf.tile(box_shape[None, None], (grid_height, grid_width, 1))
         stride = tf.cast(tf.stack([stride_height, stride_width]), tf.float32)
         stride = tf.tile(stride[None, None], (grid_height, grid_width, 1))
