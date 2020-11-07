@@ -54,7 +54,7 @@ box_loss = model.BoxRegressionLoss(delta)
 loss = model.EfficientDetLoss(class_loss, box_loss, loss_weights, num_classes)
 
 # dataset
-prepper = train_data_prep.ImageBasicPreparation(min_scale=0.8, max_scale=1.2, target_shape=256)
+prepper = train_data_prep.ImageBasicPreparation(min_scale=1.0, max_scale=1.2, target_shape=256)
 iou_match_thresh = 0.5
 dataset = coco.Coco(
     anchors=anchors,

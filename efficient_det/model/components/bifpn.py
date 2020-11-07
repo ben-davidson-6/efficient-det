@@ -84,7 +84,7 @@ class BiFPNLayer(tf.keras.layers.Layer):
 
 
 class BiFPNNode(tf.keras.layers.Layer):
-    eps = 1e-7
+    eps = 1e-10
 
     def __init__(self, num_inputs, depth, upsample):
         super(BiFPNNode, self).__init__()
@@ -101,16 +101,18 @@ class BiFPNNode(tf.keras.layers.Layer):
             kernel_size=3,
             use_bias=False,
             activation='swish',
-            depth_multiplier=1,
-            padding='SAME')
+            padding='SAME',
+            depthwise_initializer=tf.initializers.VarianceScaling(),
+            pointwise_initializer=tf.initializers.VarianceScaling()
+        )
         self.bn = tf.keras.layers.BatchNormalization()
 
     def call(self, inputs, training=None):
         """inputs[-1] should be the node that needs to be increased or decreased"""
         self.assert_recieved_correct_number_inputs(inputs)
         inputs = self.resize_final_input(inputs)
-        x = self.fuse(inputs)
-        x = self.seperable_conv(x)
+        fused = self.fuse(inputs)
+        x = self.seperable_conv(fused)
         x = self.bn(x, training=training)
         return x
 
