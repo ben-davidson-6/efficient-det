@@ -14,3 +14,7 @@ def draw_model_output(image, boxes, scores, thresh):
         tf.constant([(0., 0., 1.), (0., 1., 0.), (1., 0., 0.)]))
     return image
 
+
+def draw_image_with_boxes(image, bboxes):
+    return tf.image.draw_bounding_boxes(image[None], bboxes[None], colors=[(1., 0., 0.), (0., 1., 0.)])[0]
+

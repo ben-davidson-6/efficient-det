@@ -1,7 +1,27 @@
 import pytest
 import tensorflow as tf
-
 import efficient_det.model.loss as loss
+
+from pytest_mock import mocker
+
+
+@pytest.fixture
+def learnable_model_and_data():
+    class W(tf.keras.layers.Layer):
+        def __init__(self, h, w):
+            super(W, self).__init__()
+            self.w = tf.Variable(initial_value=tf.ones((h, w, 1, 5)))
+
+        def call(self, x, training=None):
+            return self.w
+
+    model = tf.keras.Sequential([
+        W(1, 1)
+    ])
+
+    class_inputs = tf.data.Dataset.from_tensor_slices((tf.range(1), -1*tf.ones([1, 1, 1, 1, 5]))).repeat(500)
+
+    return model, class_inputs
 
 
 def test_outputs_correct_shape():
@@ -29,12 +49,48 @@ def test_doesnt_mask_everything():
     assert out > 0
 
 
-@pytest.mark.skip('checking output')
-def test_cross_entropy():
-    loss = tf.keras.losses.BinaryCrossentropy(
-        from_logits=True,
-        label_smoothing=0)
-    a = tf.random.uniform([2, 2])
-    b = tf.random.uniform([2, 2])
-    print(loss(a, b))
+def test_loss_can_learn_classes(learnable_model_and_data):
+    model, dataset = learnable_model_and_data
+
+    l = loss.loss(weights=[1., 0.], alpha=0.25, gamma=1.25, delta=0.1, n_classes=1)
+    model.compile(tf.keras.optimizers.Adam(.1), loss=l)
+    model.fit(dataset)
+    weights = model(tf.constant(1))
+    learned_weight = tf.nn.sigmoid(weights[..., 0])
+    tf.debugging.assert_greater(learned_weight, 0.)
+    tf.debugging.assert_less(learned_weight, 0.1)
+
+
+def test_can_learn_boxes(learnable_model_and_data, mocker):
+    model, dataset = learnable_model_and_data
+
+    mocker.patch.object(loss.EfficientDetLoss, attribute='_calculate_mask_and_normaliser', return_value=None)
+    l = loss.loss(weights=[0., 1.], alpha=0.25, gamma=1.25, delta=10, n_classes=1)
+    model.compile(tf.keras.optimizers.Adam(.1), loss=l)
+    model.fit(dataset)
+    weights = model(tf.constant(1))
+    learned_weight = weights[..., 1:]
+    tf.debugging.assert_less(learned_weight, -0.5*tf.ones([4]))
+    tf.debugging.assert_greater(learned_weight, -1.2*tf.ones([4]))
+
+
+def test_can_learn_both(learnable_model_and_data, mocker):
+    model, dataset = learnable_model_and_data
+
+    mocker.patch.object(loss.EfficientDetLoss, attribute='_calculate_mask_and_normaliser', return_value=None)
+    l = loss.loss(weights=[1., 1.], alpha=0.25, gamma=1.25, delta=10, n_classes=1)
+    model.compile(tf.keras.optimizers.Adam(.2), loss=l)
+    model.fit(dataset)
+    weights = model(tf.constant(1))
+
+    learned_class = tf.nn.sigmoid(weights[..., 0])
+    tf.debugging.assert_greater(learned_class, 0.)
+    tf.debugging.assert_less(learned_class, 0.1)
+
+    learned_box = weights[..., 1:]
+    tf.debugging.assert_less(learned_box, -0.5 * tf.ones([4]))
+    tf.debugging.assert_greater(learned_box, -1.2 * tf.ones([4]))
+
+
+
 

@@ -11,7 +11,7 @@ class EfficientDetLoss(tf.keras.losses.Loss):
         self.weights = weights
         self.n_classes = n_classes
 
-    def call(self, y_true, y_pred):
+    def call(self, y_true, y_pred, sample_weight=None):
         """
         This works on a single level, as in keras.fit if there are multiple outputs then the loss will
         be applied to each in the list and combined!
@@ -27,23 +27,20 @@ class EfficientDetLoss(tf.keras.losses.Loss):
         -------
 
         """
+
         y_true_class, y_true_regression = tf.cast(y_true[..., 0], tf.int32), y_true[..., 1:]
         y_pred_class, y_pred_regression = y_pred[..., :self.n_classes], y_pred[..., self.n_classes:]
-        # tf.print(tf.reduce_mean(y_pred_class, [0, 1, 2, 3]))
-        # tf.print(tf.reduce_mean(tf.reshape(y_pred_regression, [-1, 4]), axis=0), end='est\n')
-        # tf.print(tf.reduce_mean(tf.reshape(y_true_regression, [-1, 4]), axis=0), end='true\n')
-        # tf.print(tf.reduce_mean(tf.reshape(y_pred_class, [-1, self.n_classes]), axis=0), end='est_probs\n')
-        non_background, num_positive_per_image = self._calculate_mask_and_normaliser(y_true)
-
+        box_sample_weight = EfficientDetLoss._calculate_mask_and_normaliser(y_true)
         fl = self.focal_loss(y_true_class, y_pred_class)*self.weights[0]
-        bl = self.box_loss(y_true_regression, y_pred_regression, 4*non_background/num_positive_per_image)*self.weights[1]
+        bl = self.box_loss(y_true_regression, y_pred_regression, box_sample_weight)*self.weights[1]
         return fl + bl
 
-    def _calculate_mask_and_normaliser(self, y_true_class):
+    @staticmethod
+    def _calculate_mask_and_normaliser(y_true_class):
         non_background = y_true_class != NO_CLASS_LABEL
         non_background = tf.cast(non_background, tf.float32)
         num_positive_per_image = tf.maximum(tf.reduce_sum(non_background, [1, 2, 3], keepdims=True), 1.)
-        return non_background, num_positive_per_image
+        return 4*non_background/num_positive_per_image
 
 
 class FocalLoss(tf.keras.losses.Loss):
@@ -77,7 +74,7 @@ class BoxRegressionLoss(tf.keras.losses.Loss):
         self.huber_loss = tf.keras.losses.Huber(delta)
 
     def call(self, y_true, y_pred, sample_weight=None):
-        return self.huber_loss(y_true, y_pred, sample_weight)
+        return self.huber_loss(y_true, y_pred)
 
 
 def loss(weights, alpha, gamma, delta, n_classes):

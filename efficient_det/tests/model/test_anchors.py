@@ -1,7 +1,4 @@
-import pytest
 import tensorflow as tf
-import numpy as np
-import matplotlib.pyplot as plt
 
 from efficient_det.datasets.coco import Coco
 from efficient_det.model.anchor import build_anchors

@@ -46,7 +46,7 @@ num_classes = 80
 efficient_det = model.EfficientDetNetwork(phi, num_classes, anchors)
 
 # loss
-loss_weights = tf.constant([1., 1.])
+loss_weights = tf.constant([1., 0.])
 gamma = 2.0
 delta = 0.1
 alpha = 0.25
@@ -55,18 +55,18 @@ box_loss = model.BoxRegressionLoss(delta)
 loss = model.EfficientDetLoss(class_loss, box_loss, loss_weights, num_classes)
 
 # dataset
-prepper = train_data_prep.ImageBasicPreparation(min_scale=0.5, max_scale=1., target_shape=512)
-iou_match_thresh = 0.5
+prepper = train_data_prep.ImageBasicPreparation(min_scale=0.5, max_scale=1., target_shape=256)
+iou_match_thresh = 0.2
 dataset = coco.Coco(
     anchors=anchors,
     augmentations=None,
     basic_training_prep=prepper,
     iou_thresh=iou_match_thresh,
-    batch_size=4)
+    batch_size=16)
 
 # training loop
 time = datetime.datetime.utcnow().strftime('%h_%d_%H%M%S')
-adam = tf.keras.optimizers.Adam(learning_rate=0.0001)
+adam = tf.keras.optimizers.Adam(learning_rate=0.001)
 metrics = [model.MeanIOU(num_classes)]
 efficient_det.compile(optimizer=adam, loss=loss, metrics=metrics)
 save_model = tf.keras.callbacks.ModelCheckpoint(
