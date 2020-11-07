@@ -1,5 +1,6 @@
 import tensorflow as tf
 import math
+import random
 
 
 class DetectionHead(tf.keras.layers.Layer):
@@ -34,6 +35,7 @@ class FullyConnectedHead(tf.keras.layers.Layer):
         self.repeats = repeats
         self.depth = depth
         self.convs = [self.seperable_conv_layer() for _ in range(self.repeats)]
+        self.bns = [tf.keras.layers.BatchNormalization() for _ in range(self.repeats)]
         number_out = num_anchors*(num_class + 4)
         self.classification_layer = tf.keras.layers.Conv2D(
             filters=number_out,
@@ -45,12 +47,13 @@ class FullyConnectedHead(tf.keras.layers.Layer):
     def call(self, inputs, training=None):
         outputs = []
         for level in inputs:
-            outputs.append(self.put_level_through_head(level))
+            outputs.append(self.put_level_through_head(level, training))
         return outputs
 
-    def put_level_through_head(self, x):
-        for conv in self.convs:
+    def put_level_through_head(self, x, training):
+        for conv, bn in zip(self.convs, self.bns):
             x = conv(x)
+            x = bn(x, training)
         x = self.classification_layer(x)
         return x
 
@@ -58,6 +61,7 @@ class FullyConnectedHead(tf.keras.layers.Layer):
         return tf.keras.layers.SeparableConv2D(
             self.depth,
             kernel_size=3,
+            use_bias=False,
             padding='SAME',
             activation='swish',
             dtype=tf.float32,

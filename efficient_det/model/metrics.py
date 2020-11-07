@@ -1,6 +1,5 @@
 import tensorflow as tf
 
-from efficient_det.model.model import PostProcessor
 from efficient_det import NO_CLASS_LABEL
 
 
@@ -11,18 +10,15 @@ class MeanIOU(tf.keras.metrics.Metric):
         super(MeanIOU, self).__init__(name='class_accuracy')
 
     def update_state(self, y_true, y_pred, sample_weight=None):
-        y_true = tf.cast(y_true[..., 0], tf.int32)
+        y_true = tf.cast(y_true[..., 0], tf.int64)
         y_pred = tf.nn.sigmoid(y_pred[..., :self.num_classes])
         actual_classes = y_true != NO_CLASS_LABEL
         y_true = tf.boolean_mask(y_true, actual_classes)
         y_pred = tf.boolean_mask(y_pred, actual_classes)
+        # tf.print(y_pred[:10, :10], summarize=300)
 
-        # to_print = tf.stack([
-        #     tf.cast(y_true, tf.float32),
-        #     tf.cast(tf.argmax(y_pred, axis=-1), tf.float32),
-        #     tf.reduce_max(y_pred, axis=-1)], axis=1)[:30]
-        # tf.print(to_print, end='metric\n', summarize=-1)
         y_pred = tf.argmax(y_pred, axis=-1)
+        # tf.print(tf.stack([y_true, y_pred], axis=-1)[:20], summarize=300)
         self.iou.update_state(y_true, y_pred)
 
     def reset_states(self):
@@ -35,19 +31,11 @@ class MeanIOU(tf.keras.metrics.Metric):
         return {'num_classes': self.num_classes}
 
 
-class APAt(tf.keras.metrics.Metric):
-    def __init__(self, threshold, anchors):
-        super(APAt, self).__init__(name=f'AP@{threshold}')
-        self.threshold = threshold
-        self.post_processor = PostProcessor(anchors)
-
-    def update_state(self, y_true, y_pred, sample_weight=None):
-        flat_tlbr, flat_label, flat_score = self.post_processor.model_out_to_flat_tlbr_label_score(y_pred)
-        flat_tlbr_gt, flat_label_gt = self.post_processor.ground_truth_to_flat_tlbr_label(y_true)
-
-
-
-
-    def result(self):
-        return self.true_positives
+if __name__ == '__main__':
+    iou = tf.keras.metrics.MeanIoU(3)
+    k = tf.random.uniform([10], minval=0, maxval=2, dtype=tf.int32)
+    x = tf.random.uniform([10], minval=0, maxval=2, dtype=tf.int32)
+    iou.update_state(k, x)
+    print(k, x)
+    print(iou.result())
 

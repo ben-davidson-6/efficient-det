@@ -36,7 +36,6 @@ for octave in range(3):
     scale = 2**(octave/3)
     for aspect in base_aspects:
         aspects.append((aspect[0]*scale, aspect[1]*scale))
-
 num_levels = 6
 anchors = model.build_anchors(anchor_size, num_levels=num_levels, aspects=aspects)
 
@@ -47,7 +46,7 @@ efficient_det = model.EfficientDetNetwork(phi, num_classes, anchors)
 
 # loss
 loss_weights = tf.constant([1., 0.])
-gamma = 2.0
+gamma = 1.5
 delta = 0.1
 alpha = 0.25
 class_loss = model.FocalLoss(alpha, gamma, num_classes)
@@ -55,8 +54,8 @@ box_loss = model.BoxRegressionLoss(delta)
 loss = model.EfficientDetLoss(class_loss, box_loss, loss_weights, num_classes)
 
 # dataset
-prepper = train_data_prep.ImageBasicPreparation(min_scale=0.5, max_scale=1., target_shape=256)
-iou_match_thresh = 0.2
+prepper = train_data_prep.ImageBasicPreparation(min_scale=0.8, max_scale=1.2, target_shape=256)
+iou_match_thresh = 0.5
 dataset = coco.Coco(
     anchors=anchors,
     augmentations=None,
@@ -66,7 +65,7 @@ dataset = coco.Coco(
 
 # training loop
 time = datetime.datetime.utcnow().strftime('%h_%d_%H%M%S')
-adam = tf.keras.optimizers.Adam(learning_rate=0.001)
+adam = tf.keras.optimizers.Adam(learning_rate=0.001, clipnorm=5.0)
 metrics = [model.MeanIOU(num_classes)]
 efficient_det.compile(optimizer=adam, loss=loss, metrics=metrics)
 save_model = tf.keras.callbacks.ModelCheckpoint(

@@ -28,7 +28,7 @@ class EfficientDetNetwork(tf.keras.Model):
         self.bifpn = self.get_bifpn()
         self.detection_head = self.get_detection_head()
 
-    @tf.function
+    # @tf.function
     def call(self, x, training=None, mask=None):
         # todo add make sure is sufficiently even
         x = self.backbone(x, training)

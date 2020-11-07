@@ -116,8 +116,9 @@ class BiFPNNode(tf.keras.layers.Layer):
         return [i for i in inputs[:-1]] + [self.resampler(inputs[-1])]
 
     def weight_each(self, inputs):
-        normaliser = tf.reduce_sum(self.fusion_weights) + BiFPNNode.eps
-        weights = self.fusion_weights / normaliser
+        weights = tf.nn.relu(self.fusion_weights)
+        normaliser = tf.reduce_sum(weights) + BiFPNNode.eps
+        weights /= normaliser
         weighted = [weights[i] * x for i, x in enumerate(inputs)]
         return weighted
 

@@ -11,7 +11,7 @@ def test_out_shape(mocker):
     h = w = 256
     anchors.aspects = [x for x in range(n_anchors)]
     net = EfficientDetNetwork(phi=0, num_classes=n_classes, anchors=anchors)
-    image = tf.random.uniform(shape=[1, h, w, 3])
+    image = tf.random.uniform(shape=[1, h, w, 3], minval=0., maxval=255.)
     out = net(image)
     assert len(out) == 6
     for i in range(6):
