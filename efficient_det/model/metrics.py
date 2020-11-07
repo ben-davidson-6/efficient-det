@@ -15,10 +15,8 @@ class MeanIOU(tf.keras.metrics.Metric):
         actual_classes = y_true != NO_CLASS_LABEL
         y_true = tf.boolean_mask(y_true, actual_classes)
         y_pred = tf.boolean_mask(y_pred, actual_classes)
-        # tf.print(y_pred[:10, :10], summarize=300)
 
         y_pred = tf.argmax(y_pred, axis=-1)
-        # tf.print(tf.stack([y_true, y_pred], axis=-1)[:20], summarize=300)
         self.iou.update_state(y_true, y_pred)
 
     def reset_states(self):

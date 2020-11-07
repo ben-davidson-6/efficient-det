@@ -36,7 +36,7 @@ for octave in range(3):
     scale = 2**(octave/3)
     for aspect in base_aspects:
         aspects.append((aspect[0]*scale, aspect[1]*scale))
-num_levels = 6
+num_levels = 5
 anchors = model.build_anchors(anchor_size, num_levels=num_levels, aspects=aspects)
 
 # network

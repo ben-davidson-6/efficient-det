@@ -1,7 +1,7 @@
 import pytest
 import tensorflow as tf
 
-from efficient_det.model.components.downsampler import Downsampler
+from efficient_det.model.components.model_fudgers import Downsampler
 
 
 def test_downsampler():

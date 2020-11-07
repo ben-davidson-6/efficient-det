@@ -96,31 +96,33 @@ class BiFPNNode(tf.keras.layers.Layer):
 
         self.resampler = self.build_resampler()
         self.fusion_weights = tf.Variable(initial_value=tf.ones([self.num_inputs]))
-        self.seperable_conv = tf.keras.layers.SeparableConv2D(depth, kernel_size=1, use_bias=False)
+        self.seperable_conv = tf.keras.layers.SeparableConv2D(
+            depth,
+            kernel_size=3,
+            use_bias=False,
+            activation='swish',
+            depth_multiplier=1,
+            padding='SAME')
         self.bn = tf.keras.layers.BatchNormalization()
-        self.activation = tf.keras.layers.Activation(tf.keras.activations.swish)
-        self.concater = tf.keras.layers.Concatenate()
 
     def call(self, inputs, training=None):
         """inputs[-1] should be the node that needs to be increased or decreased"""
         self.assert_recieved_correct_number_inputs(inputs)
         inputs = self.resize_final_input(inputs)
-        x = self.weight_each(inputs)
-        x = self.concater(x)
+        x = self.fuse(inputs)
         x = self.seperable_conv(x)
         x = self.bn(x, training=training)
-        x = self.activation(x)
         return x
 
     def resize_final_input(self, inputs):
         return [i for i in inputs[:-1]] + [self.resampler(inputs[-1])]
 
-    def weight_each(self, inputs):
+    def fuse(self, inputs):
         weights = tf.nn.relu(self.fusion_weights)
         normaliser = tf.reduce_sum(weights) + BiFPNNode.eps
         weights /= normaliser
         weighted = [weights[i] * x for i, x in enumerate(inputs)]
-        return weighted
+        return tf.add_n(weighted)
 
     def build_resampler(self):
         if self.upsample:
