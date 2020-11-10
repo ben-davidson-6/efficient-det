@@ -36,16 +36,16 @@ for octave in range(3):
     scale = 2**(octave/3)
     for aspect in base_aspects:
         aspects.append((aspect[0]*scale, aspect[1]*scale))
-num_levels = 5
+num_levels = 4
 anchors = model.build_anchors(anchor_size, num_levels=num_levels, aspects=aspects)
 
 # network
 phi = 0
 num_classes = 80
-efficient_det = model.EfficientDetNetwork(phi, num_classes, anchors)
+efficient_det = model.EfficientDetNetwork(phi, num_classes, anchors, n_extra_downsamples=1)
 
 # loss
-loss_weights = tf.constant([1., 0.])
+loss_weights = tf.constant([1., 50.])
 gamma = 1.5
 delta = 0.1
 alpha = 0.25
@@ -54,14 +54,14 @@ box_loss = model.BoxRegressionLoss(delta)
 loss = model.EfficientDetLoss(class_loss, box_loss, loss_weights, num_classes)
 
 # dataset
-prepper = train_data_prep.ImageBasicPreparation(min_scale=1.0, max_scale=1.2, target_shape=256)
+prepper = train_data_prep.ImageBasicPreparation(min_scale=1.0, max_scale=1.2, target_shape=512)
 iou_match_thresh = 0.5
 dataset = coco.Coco(
     anchors=anchors,
     augmentations=None,
     basic_training_prep=prepper,
     iou_thresh=iou_match_thresh,
-    batch_size=16)
+    batch_size=4)
 
 # training loop
 time = datetime.datetime.utcnow().strftime('%h_%d_%H%M%S')
