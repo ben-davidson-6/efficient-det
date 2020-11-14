@@ -52,11 +52,9 @@ class TensorboardCallback(tf.keras.callbacks.Callback):
         validation = []
         for image, offset in self.validation_examples:
             if with_model:
-                box, label, score = self.get_net()(image, training=False)
+                box, score, label, _ = self.get_net()(image, training=False)
             else:
-                box, label = self.get_net().process_ground_truth(offset)
-                score = tf.ones_like(label, dtype=tf.float32)
-                box = tf.where(label[..., None] == NO_CLASS_LABEL, box, -1.)
+                box, score, label, _ = self.get_net().process_ground_truth(offset)
             image = draw_model_output(image, box, score, thresh)
             image = tf.image.resize(image, (TensorboardCallback.IMAGE_SIZE, TensorboardCallback.IMAGE_SIZE))
             validation.append(image[0])
@@ -67,13 +65,10 @@ class TensorboardCallback(tf.keras.callbacks.Callback):
         for i in range(TensorboardCallback.MAX_EXAMPLES_PER_DATASET):
             image = self.training_examples[0][i][None]
             if with_model:
-                box, label, score = self.get_net()(image, training=False)
+                box, label, score, _ = self.get_net()(image, training=False)
             else:
                 offset = [x[i:i+1] for x in self.training_examples[1]]
-                box, label = self.get_net().process_ground_truth(offset)
-                score = tf.ones_like(label, dtype=tf.float32)
-                box = tf.where(label[..., None] == NO_CLASS_LABEL, box, -1.)
-
+                box, score, label, _ = self.get_net().process_ground_truth(offset)
             image = draw_model_output(image, box, score, thresh)
             image = tf.image.resize(image, (TensorboardCallback.IMAGE_SIZE, TensorboardCallback.IMAGE_SIZE))
             training.append(image[0])
@@ -103,20 +98,10 @@ class TensorboardCallback(tf.keras.callbacks.Callback):
 
     def _write_image_summaries(self, epoch):
         validation, training = self._build_summary_image()
-        val_hists, training_hists = self._build_histograms()
         with self.validation_writer.as_default():
-            offsets, classes, scores, gt_labels = val_hists
             tf.summary.image('examples', validation, step=epoch)
-            tf.summary.histogram('classes', classes, step=epoch)
-            tf.summary.histogram('offsets', offsets, step=epoch)
-            tf.summary.histogram('scores', scores, step=epoch)
-            tf.summary.histogram('gt', gt_labels, step=epoch)
         with self.training_writer.as_default():
-            offsets, classes, scores = training_hists
             tf.summary.image('examples', training, step=epoch)
-            tf.summary.histogram('classes', classes, step=epoch)
-            tf.summary.histogram('offsets', offsets, step=epoch)
-            tf.summary.histogram('scores', scores, step=epoch)
 
     def write_metric_stats(self, logs):
         with self.validation_writer.as_default():
@@ -146,23 +131,6 @@ class TensorboardCallback(tf.keras.callbacks.Callback):
         validation = tf.concat([validation_gt, validation_image], axis=0)
         training = tf.concat([training_gt, training_image], axis=0)
         return validation[None], training[None]
-
-    def _build_histograms(self):
-        train_hists = []
-        for i in range(TensorboardCallback.MAX_EXAMPLES_PER_DATASET):
-            image = self.training_examples[0][i][None]
-            box, label, score = self.get_net()(image, training=False)
-            train_hists.append((box, label, score))
-
-        val_hists = []
-        for image, offset in self.validation_examples:
-            box, label, score = self.get_net()(image, training=False)
-            gt_labels = tf.concat([tf.reshape(o[..., 0], [-1]) for o in offset], axis=0)
-            val_hists.append((box, label, score, gt_labels))
-
-        val_hists = list(map(lambda x: tf.concat(x, axis=0), zip(*val_hists)))
-        train_hists = list(map(lambda x: tf.concat(x, axis=0), zip(*train_hists)))
-        return val_hists, train_hists
 
     @staticmethod
     def _make_file_writer(log_dir, name):

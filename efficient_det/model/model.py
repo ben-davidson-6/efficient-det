@@ -1,9 +1,9 @@
 import os
-# print('delet me')
-# os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
-# os.environ['PATH'] += ';C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v10.1\\extras\\CUPTI\\lib64'
-# os.environ['TF_GPU_THREAD_MODE'] = 'gpu_private'
-# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+print('delet me')
+os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
+os.environ['PATH'] += ';C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v10.1\\extras\\CUPTI\\lib64'
+os.environ['TF_GPU_THREAD_MODE'] = 'gpu_private'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 import tensorflow as tf
 import math
@@ -30,7 +30,6 @@ class EfficientDetNetwork(tf.keras.Model):
         self.bifpn = self.get_bifpn()
         self.detection_head = self.get_detection_head()
 
-    # @tf.function
     def call(self, x, training=None, mask=None):
         # todo add make sure is sufficiently even
         x = self.backbone(x, training)
@@ -64,35 +63,30 @@ class EfficientDetNetwork(tf.keras.Model):
 
 
 class PostProcessor:
-    def __init__(self, anchors):
+    def __init__(self, anchors, num_classes):
         self.anchors = anchors
+        self.num_classes = num_classes
 
     def process_output(self, model_out):
-        flat_tlbr, flat_label, flat_score = self.model_out_to_flat_tlbr_label_score(model_out)
-        # unique, idx = tf.unique(flat_label[0])
-        # box_indices = tf.image.non_max_suppression(flat_tlbr, flat_score, 50)
-        # tlbr = tf.gather(flat_tlbr, box_indices)
-        # label = tf.gather(flat_label, box_indices)
-        # score = tf.gather(flat_score, box_indices)
-        return flat_tlbr, flat_label, flat_score
+        tlbr, probs = self._model_out_to_flat_tlbr_label_score(model_out)
+        tlbr, probs, labels, valid_detections = self._apply_nms(tlbr, probs)
+        return tlbr, probs, labels, valid_detections
 
-    def model_out_to_flat_tlbr_label_score(self, y_pred):
-        offset_tensors, label, score = PostProcessor._predicted_unpack(y_pred)
+    def _apply_nms(self, tlbr, probs):
+        return tf.image.combined_non_max_suppression(
+            tlbr,
+            probs,
+            max_output_size_per_class=25,
+            max_total_size=200,
+            score_threshold=0.5)
+
+    def _model_out_to_flat_tlbr_label_score(self, y_pred):
+        offset_tensors, class_probabilities = PostProcessor._predicted_unpack(y_pred)
         tlbr_tensor = self.anchors.to_tlbr_tensor(offset_tensors)
-        flat_tlbr, flat_label, flat_score = PostProcessor._flatten_tensors_and_list(
+        tlbr, probs = self._reshape_for_nms(
             tlbr_tensor,
-            label,
-            score)
-        return flat_tlbr, flat_label, flat_score
-
-    def ground_truth_to_flat_tlbr_label(self, y_true):
-        offset, label = PostProcessor._truth_unpack(y_true)
-        tlbr_tensor = self.anchors.to_tlbr_tensor(offset)
-        flat_tlbr, flat_label, _ = PostProcessor._flatten_tensors_and_list(
-            tlbr_tensor,
-            label,
-            [tf.ones_like(x) for x in label])
-        return flat_tlbr, flat_label
+            class_probabilities)
+        return tlbr, probs
 
     @staticmethod
     def _predicted_unpack(y_pred):
@@ -100,13 +94,31 @@ class PostProcessor:
         for level_out in y_pred:
             offset = level_out[..., -4:]
             probabilities = tf.nn.sigmoid(level_out[..., :-4])
-            score = tf.reduce_max(probabilities, axis=-1, keepdims=True)
-            label = tf.argmax(score, axis=-1)[..., None]
-            out.append((offset, label, score))
+            out.append((offset, probabilities))
         return zip(*out)
+
+    def _reshape_for_nms(self, tlbr, probabilities):
+        for_nms = []
+        batch_size = tf.shape(tlbr[0])[0]
+        for box, prob in zip(tlbr, probabilities):
+            box = tf.reshape(box, [batch_size, -1, 1, 4])
+            prob = tf.reshape(prob, [batch_size, -1, self.num_classes])
+            for_nms.append((box, prob))
+        tlbr, prob = [tf.concat(x, axis=1) for x in zip(*for_nms)]
+        return tlbr, prob
+
+    def ground_truth_to_flat_tlbr_label(self, y_true):
+        # todo this shouldnt really exist
+        offset, label = PostProcessor._truth_unpack(y_true)
+        tlbr_tensor = self.anchors.to_tlbr_tensor(offset)
+        tlbr, probs = self._reshape_for_nms(
+            tlbr_tensor,
+            [tf.one_hot(x, depth=self.num_classes) for x in label])
+        return self._apply_nms(tlbr, probs)
 
     @staticmethod
     def _truth_unpack(y_true):
+        # todo this should really exist
         out = []
         for level_out in y_true:
             offset = level_out[..., -4:]
@@ -114,28 +126,16 @@ class PostProcessor:
             out.append((offset, label))
         return zip(*out)
 
-    @staticmethod
-    def _flatten_tensors_and_list(tlbr, label, score):
-        flattened = []
-        batch_size = tf.shape(tlbr[0])[0]
-        for box, l, s in zip(tlbr, label, score):
-            box = tf.reshape(box, [batch_size, -1, 4])
-            l = tf.reshape(l, [batch_size, -1])
-            s = tf.reshape(s, [batch_size, -1])
-            flattened.append((box, l, s))
-        tlbr, l, s = [tf.concat(x, axis=1) for x in zip(*flattened)]
-        return tlbr, l, s
-
 
 class InferenceEfficientNet:
     def __init__(self, efficient_det):
         self.efficient_det = efficient_det
-        self.post_processor = PostProcessor(efficient_det.anchors)
+        self.post_processor = PostProcessor(efficient_det.anchors, self.efficient_det.num_classes)
 
     def __call__(self, x, training):
         model_out = self.efficient_det(x, training)
-        boxes, label, score = self.post_processor.process_output(model_out)
-        return boxes, label, score
+        boxes, label, score, valid_detections = self.post_processor.process_output(model_out)
+        return boxes, label, score, valid_detections
 
     def process_ground_truth(self, y_true):
         return self.post_processor.ground_truth_to_flat_tlbr_label(y_true)
@@ -159,7 +159,7 @@ if __name__ == '__main__':
         for aspect in base_aspects:
             aspects.append((aspect[0] * scale, aspect[1] * scale))
 
-    anchors = model.build_anchors(anchor_size, num_levels=6, aspects=aspects)
+    anchors = model.build_anchors(anchor_size, num_levels=5, aspects=aspects)
 
     dataset = coco.Coco(
         anchors=anchors,
@@ -172,19 +172,12 @@ if __name__ == '__main__':
     phi = 0
     num_classes = 80
     efficient_det = model.EfficientDetNetwork(phi, num_classes, anchors)
-    # efficient_det.load_weights('C:\\Users\\bne\\PycharmProjects\\efficient-det\\artifacts\\models\\Oct_31_193800\\model')
+    efficient_det.load_weights('C:\\Users\\bne\\PycharmProjects\\efficient-det\\artifacts\\models\\Nov_12_192003\\model')
 
-    class_act = model.metrics.MeanIOU(80)
-    for image, offset in dataset.validation_set():
-        model_out = efficient_det(image, training=False)
-        for gt, pred in zip(offset, model_out):
-            class_act.update_state(gt, pred)
-        print(class_act.result())
-        break
-
-    # inference_model = InferenceEfficientNet(efficient_det)
-    # for x, y in dataset.validation_set():
-    #     box, label, score = inference_model(x, training=False)
-    #     image = draw_model_output(x, box, score, 0.5)
-    #     plt.imshow(image[0])
-    #     plt.show()
+    inference_model = InferenceEfficientNet(efficient_det)
+    for x, y in dataset.validation_set():
+        box, score, label, valid_detections = inference_model(x, training=False)
+        # inference_model.process_ground_truth(y)
+        image = draw_model_output(x, box, score, 0.5)
+        plt.imshow(image[0])
+        plt.show()

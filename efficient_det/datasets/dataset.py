@@ -53,18 +53,17 @@ class Dataset:
         if bboxes.is_empty():
             offset = self._empty_offset(height, width)
         else:
-            offsets_ious_boxes = self.anchors.to_offset_tensors(bboxes, height, width)
-            offsets, ious, matched_boxes = zip(*offsets_ious_boxes)
-            labels = [tf.gather(tf.cast(labels, tf.float32), box) for box in matched_boxes]
-            ious = [x > self.iou_thresh for x in ious]
-            labels = [tf.where(iou, label, efficient_det.NO_CLASS_LABEL) for iou, label in zip(ious, labels)]
-            offset = tuple([tf.concat([label[..., None], offset], axis=-1) for label, offset in zip(labels, offsets)])
+            offset = self._non_empty_offset(bboxes, labels, height, width)
         return image, offset
 
-    def _closest_acceptable_multiple(self, image, box, label):
-        # todo hack for the time being
-        image = tf.image.resize(image, (512, 512))
-        return image, box, label
+    def _non_empty_offset(self, bboxes, labels, height, width):
+        offsets_ious_boxes = self.anchors.to_offset_tensors(bboxes, height, width)
+        offsets, ious, matched_boxes = zip(*offsets_ious_boxes)
+        labels = [tf.gather(tf.cast(labels, tf.float32), box) for box in matched_boxes]
+        ious = [x > self.iou_thresh for x in ious]
+        labels = [tf.where(iou, label, efficient_det.NO_CLASS_LABEL) for iou, label in zip(ious, labels)]
+        offset = tuple([tf.concat([label[..., None], offset], axis=-1) for label, offset in zip(labels, offsets)])
+        return offset
 
     def _empty_offset(self, height, width):
         offset = []
@@ -73,6 +72,11 @@ class Dataset:
             empty_level = tf.ones([height // stride, width // stride, len(self.anchors.aspects), 5]) * efficient_det.NO_CLASS_LABEL
             offset.append(empty_level)
         return tuple(offset)
+
+    def _closest_acceptable_multiple(self, image, box, label):
+        # todo hack for the time being
+        image = tf.image.resize(image, (512, 512))
+        return image, box, label
 
     def _raw_validation_set(self,):
         raise NotImplemented

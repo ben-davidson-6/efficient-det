@@ -36,22 +36,20 @@ for octave in range(3):
     scale = 2**(octave/3)
     for aspect in base_aspects:
         aspects.append((aspect[0]*scale, aspect[1]*scale))
-num_levels = 4
+num_levels = 5
 anchors = model.build_anchors(anchor_size, num_levels=num_levels, aspects=aspects)
 
 # network
 phi = 0
 num_classes = 80
-efficient_det = model.EfficientDetNetwork(phi, num_classes, anchors, n_extra_downsamples=1)
+efficient_det = model.EfficientDetNetwork(phi, num_classes, anchors, n_extra_downsamples=2)
 
 # loss
-loss_weights = tf.constant([1., 50.])
+loss_weights = tf.constant([1., 1.])
 gamma = 1.5
 delta = 0.1
 alpha = 0.25
-class_loss = model.FocalLoss(alpha, gamma, num_classes)
-box_loss = model.BoxRegressionLoss(delta)
-loss = model.EfficientDetLoss(class_loss, box_loss, loss_weights, num_classes)
+loss = model.EfficientDetLoss(alpha, gamma, delta, loss_weights, num_classes)
 
 # dataset
 prepper = train_data_prep.ImageBasicPreparation(min_scale=1.0, max_scale=1.2, target_shape=512)
@@ -65,13 +63,15 @@ dataset = coco.Coco(
 
 # training loop
 time = datetime.datetime.utcnow().strftime('%h_%d_%H%M%S')
-adam = tf.keras.optimizers.Adam(learning_rate=0.001, clipnorm=5.0)
+adam = tf.keras.optimizers.Adam(learning_rate=0.001)
 metrics = [model.MeanIOU(num_classes)]
 efficient_det.compile(optimizer=adam, loss=loss, metrics=metrics)
+efficient_det.load_weights('C:\\Users\\bne\\PycharmProjects\\efficient-det\\artifacts\\models\\Nov_12_192003\\model')
 save_model = tf.keras.callbacks.ModelCheckpoint(
     f'./artifacts/models/{time}/model',
     monitor='val_loss',
     verbose=0,
+
     save_best_only=False,
     save_weights_only=False,
     mode='auto',
