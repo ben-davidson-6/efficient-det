@@ -29,6 +29,7 @@ class MeanIOU(tf.keras.metrics.Metric):
         return {'num_classes': self.num_classes}
 
 
+
 if __name__ == '__main__':
     iou = tf.keras.metrics.MeanIoU(3)
     k = tf.random.uniform([10], minval=0, maxval=2, dtype=tf.int32)

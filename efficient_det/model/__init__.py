@@ -1,4 +1,4 @@
-from efficient_det.model.model import EfficientDetNetwork
+from efficient_det.model.model import EfficientDetNetwork, InferenceEfficientNet
 from efficient_det.model.anchor import build_anchors
 from efficient_det.model.loss import EfficientDetLoss
 from efficient_det.model.callbacks import TensorboardCallback

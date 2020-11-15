@@ -73,12 +73,14 @@ class PostProcessor:
         return tlbr, probs, labels, valid_detections
 
     def _apply_nms(self, tlbr, probs):
-        return tf.image.combined_non_max_suppression(
+        tlbr, probs, labels, valid_detections = tf.image.combined_non_max_suppression(
             tlbr,
             probs,
-            max_output_size_per_class=25,
+            max_output_size_per_class=50,
             max_total_size=200,
-            score_threshold=0.5)
+            score_threshold=0.01)
+        labels = tf.cast(labels, tf.int32)
+        return tlbr, probs, labels, valid_detections
 
     def _model_out_to_flat_tlbr_label_score(self, y_pred):
         offset_tensors, class_probabilities = PostProcessor._predicted_unpack(y_pred)
@@ -127,12 +129,13 @@ class PostProcessor:
         return zip(*out)
 
 
-class InferenceEfficientNet:
+class InferenceEfficientNet(tf.keras.models.Model):
     def __init__(self, efficient_det):
+        super(InferenceEfficientNet, self).__init__()
         self.efficient_det = efficient_det
         self.post_processor = PostProcessor(efficient_det.anchors, self.efficient_det.num_classes)
 
-    def __call__(self, x, training):
+    def call(self, x, training=None, mask=None):
         model_out = self.efficient_det(x, training)
         boxes, label, score, valid_detections = self.post_processor.process_output(model_out)
         return boxes, label, score, valid_detections

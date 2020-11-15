@@ -50,6 +50,14 @@ class TLBRBoxes(Boxes):
         box_coords = tf.stack([centroid_x, centroid_y, sx, sy], axis=-1)
         return CentroidWidthBoxes(box_coords, self.original_shape)
 
+    def as_coco_box_tensor(self):
+        t = self.tensor[..., 0]
+        l = self.tensor[..., 1]
+        width = self.tensor[..., 3] - self.tensor[..., 1]
+        height = self.tensor[..., 2] - self.tensor[..., 0]
+        box_coords = tf.stack([l, t, width, height], axis=-1)
+        return box_coords
+
     def normalise(self, height, width):
         norm = TLBRBoxes._build_normalisation_tensor(height, width)
         self.tensor = self.tensor/norm

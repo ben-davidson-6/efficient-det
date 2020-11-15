@@ -19,6 +19,10 @@ class Coco(efficient_det.datasets.dataset.Dataset):
         return ds
 
     @staticmethod
+    def validation_set_for_final_eval():
+        return Coco.raw_dataset(Coco.validation)
+
+    @staticmethod
     def get_image_box_label(example):
         image = example['image']
         bbox = example['objects']['bbox']

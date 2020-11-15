@@ -81,12 +81,16 @@ class TensorboardCallback(tf.keras.callbacks.Callback):
         pass
 
     def on_test_batch_end(self, batch, logs=None):
+        if batch%100 != 0:
+            return
         with self.validation_writer.as_default():
             for key in logs:
                 tf.summary.scalar(key, logs[key], step=self.val_batch_counter)
             self.val_batch_counter.assign_add(1)
 
     def on_train_batch_end(self, batch, logs=None):
+        if batch%100 != 0:
+            return
         with self.training_writer.as_default():
             for key in [k for k in logs if not 'val_' in k]:
                 tf.summary.scalar(key, logs[key], step=self.train_batch_counter)
