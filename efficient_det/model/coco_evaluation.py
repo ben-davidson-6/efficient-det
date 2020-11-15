@@ -1,8 +1,4 @@
-import pprint
 import tensorflow as tf
-import tempfile
-import json
-import numpy as np
 
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
