@@ -1,9 +1,9 @@
-import os
-print('delet me')
-os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
-os.environ['PATH'] += ';C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v10.1\\extras\\CUPTI\\lib64'
-os.environ['TF_GPU_THREAD_MODE'] = 'gpu_private'
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+# import os
+# print('delet me')
+# os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
+# os.environ['PATH'] += ';C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v10.1\\extras\\CUPTI\\lib64'
+# os.environ['TF_GPU_THREAD_MODE'] = 'gpu_private'
+# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 import tensorflow as tf
 import math
@@ -77,7 +77,7 @@ class PostProcessor:
             tlbr,
             probs,
             max_output_size_per_class=50,
-            max_total_size=200,
+            max_total_size=100,
             score_threshold=0.01)
         labels = tf.cast(labels, tf.int32)
         return tlbr, probs, labels, valid_detections
@@ -137,8 +137,8 @@ class InferenceEfficientNet(tf.keras.models.Model):
 
     def call(self, x, training=None, mask=None):
         model_out = self.efficient_det(x, training)
-        boxes, label, score, valid_detections = self.post_processor.process_output(model_out)
-        return boxes, label, score, valid_detections
+        boxes, score, label, valid_detections = self.post_processor.process_output(model_out)
+        return boxes, score, label, valid_detections
 
     def process_ground_truth(self, y_true):
         return self.post_processor.ground_truth_to_flat_tlbr_label(y_true)

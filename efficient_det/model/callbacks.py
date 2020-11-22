@@ -3,7 +3,6 @@ import pathlib
 
 from efficient_det.geometry.plot import draw_model_output
 from efficient_det.model.model import InferenceEfficientNet
-from efficient_det import NO_CLASS_LABEL
 
 
 class TensorboardCallback(tf.keras.callbacks.Callback):
@@ -65,7 +64,7 @@ class TensorboardCallback(tf.keras.callbacks.Callback):
         for i in range(TensorboardCallback.MAX_EXAMPLES_PER_DATASET):
             image = self.training_examples[0][i][None]
             if with_model:
-                box, label, score, _ = self.get_net()(image, training=False)
+                box, score, label, _ = self.get_net()(image, training=False)
             else:
                 offset = [x[i:i+1] for x in self.training_examples[1]]
                 box, score, label, _ = self.get_net().process_ground_truth(offset)

@@ -96,6 +96,6 @@ if __name__ == '__main__':
     phi = 0
     num_classes = 80
     efficient_det = model.EfficientDetNetwork(phi, num_classes, anchors, n_extra_downsamples=2)
-    efficient_det.load_weights('C:\\Users\\bne\\PycharmProjects\\efficient-det\\artifacts\\models\\Nov_12_192003\\model')
+    efficient_det.load_weights('C:\\Users\\bne\\PycharmProjects\\efficient-det\\artifacts\\models\\Nov_19_190358\\model')
     inference_net = model.InferenceEfficientNet(efficient_det)
     evaluate_coco_model(inference_net)

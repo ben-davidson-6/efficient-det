@@ -1,8 +1,8 @@
 import os
-# os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
-# os.environ['PATH'] += ';C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v10.1\\extras\\CUPTI\\lib64'
-# os.environ['TF_GPU_THREAD_MODE'] = 'gpu_private'
-# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
+os.environ['PATH'] += ';C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v10.1\\extras\\CUPTI\\lib64'
+os.environ['TF_GPU_THREAD_MODE'] = 'gpu_private'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 import efficient_det.model as model
 import efficient_det.datasets.coco as coco
@@ -15,12 +15,9 @@ import datetime
 #       need to have a way of forcing the shapes to be the same for down and up sampling
 #   add better training metrics
 #       ap
-#       per class accuracy/dice/conf
 #   add some seeding functionality to reproduce
 #   add augmentations
 #   move to conda and setup environment
-#   inference
-#       non maximal suppresion
 #   the number of levels is a bit esoteric for the anchors
 #       it has to match up with the downampling of the model
 
@@ -52,39 +49,43 @@ alpha = 0.25
 loss = model.EfficientDetLoss(alpha, gamma, delta, loss_weights, num_classes)
 
 # dataset
-prepper = train_data_prep.ImageBasicPreparation(min_scale=1.0, max_scale=1.2, target_shape=512)
+prepper = train_data_prep.ImageBasicPreparation(min_scale=0.8, max_scale=1.5, target_shape=512)
 iou_match_thresh = 0.5
 dataset = coco.Coco(
     anchors=anchors,
     augmentations=None,
     basic_training_prep=prepper,
     iou_thresh=iou_match_thresh,
-    batch_size=4)
+    batch_size=6)
 
 # training loop
 time = datetime.datetime.utcnow().strftime('%h_%d_%H%M%S')
 adam = tf.keras.optimizers.Adam(learning_rate=0.001)
 metrics = [model.MeanIOU(num_classes)]
 efficient_det.compile(optimizer=adam, loss=loss, metrics=metrics)
-efficient_det.load_weights('C:\\Users\\bne\\PycharmProjects\\efficient-det\\artifacts\\models\\Nov_12_192003\\model')
-save_model = tf.keras.callbacks.ModelCheckpoint(
-    f'./artifacts/models/{time}/model',
+save_best_model = tf.keras.callbacks.ModelCheckpoint(
+    f'./artifacts/models/{time}/best_model',
     monitor='val_loss',
     verbose=0,
-
+    save_best_only=True,
+    save_weights_only=True,
+    mode='auto',
+    save_freq='epoch')
+save_most_recent_model = tf.keras.callbacks.ModelCheckpoint(
+    f'./artifacts/models/{time}/best_model',
+    monitor='val_loss',
+    verbose=0,
     save_best_only=False,
-    save_weights_only=False,
+    save_weights_only=True,
     mode='auto',
     save_freq='epoch')
 
-
 tensorboard_vis = model.TensorboardCallback(dataset.training_set(), dataset.validation_set(), f'./artifacts/logs/{time}')
-cbs = [save_model, tensorboard_vis]
+cbs = [save_best_model, save_most_recent_model, tensorboard_vis]
 efficient_det.fit(
-    dataset.training_set().repeat(),
-    validation_data=dataset.validation_set().repeat(),
-    steps_per_epoch=5000,
-    validation_steps=1000,
-    epochs=999999,
+    dataset.training_set(),
+    validation_data=dataset.validation_set(),
+    epochs=300,
     callbacks=cbs
 )
+
