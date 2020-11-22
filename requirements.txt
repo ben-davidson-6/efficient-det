@@ -16,6 +16,7 @@ google-auth-oauthlib==0.4.1
 google-pasta==0.2.0
 googleapis-common-protos==1.52.0
 grpcio==1.31.0
+gviz-api==1.9.0
 h5py==2.10.0
 idna==2.10
 importlib-metadata==1.7.0
@@ -48,6 +49,7 @@ rsa==4.6
 scipy==1.4.1
 six==1.15.0
 tensorboard==2.3.0
+tensorboard-plugin-profile==2.3.0
 tensorboard-plugin-wit==1.7.0
 tensorflow-datasets==3.2.1
 tensorflow-gpu==2.3.0
