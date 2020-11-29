@@ -32,7 +32,7 @@ class EfficientDetLoss(tf.keras.losses.Loss):
         y_true_class, y_true_regression = tf.cast(y_true[..., 0], tf.int32), y_true[..., 1:]
         y_pred_class, y_pred_regression = y_pred[..., :self.n_classes], y_pred[..., self.n_classes:]
         non_background, num_positive = EfficientDetLoss._calculate_mask_and_normaliser(y_true_class)
-        fl = self.focal_loss(y_true_class, y_pred_class)*self.weights[0]
+        fl = self.focal_loss(y_true_class, y_pred_class)*self.weights[0]/num_positive[..., None]
         bl = self.huber_loss(y_true_regression, y_pred_regression, non_background/num_positive)*self.weights[1]
         return fl + bl
 

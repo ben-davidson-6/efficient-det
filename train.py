@@ -49,18 +49,19 @@ alpha = 0.25
 loss = model.EfficientDetLoss(alpha, gamma, delta, loss_weights, num_classes)
 
 # dataset
-prepper = train_data_prep.ImageBasicPreparation(min_scale=0.8, max_scale=1.5, target_shape=512)
 iou_match_thresh = 0.5
+overlap_for_crop = 0.5
+prepper = train_data_prep.ImageBasicPreparation(min_scale=0.8, overlap_percentage=overlap_for_crop, max_scale=1.5, target_shape=512)
 dataset = coco.Coco(
     anchors=anchors,
     augmentations=None,
     basic_training_prep=prepper,
     iou_thresh=iou_match_thresh,
-    batch_size=6)
+    batch_size=4)
 
 # training loop
 time = datetime.datetime.utcnow().strftime('%h_%d_%H%M%S')
-adam = tf.keras.optimizers.Adam(learning_rate=0.001)
+adam = tf.keras.optimizers.Adam(learning_rate=0.0001)
 metrics = [model.MeanIOU(num_classes)]
 efficient_det.compile(optimizer=adam, loss=loss, metrics=metrics)
 save_best_model = tf.keras.callbacks.ModelCheckpoint(

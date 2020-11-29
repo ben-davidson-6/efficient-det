@@ -5,10 +5,11 @@ from efficient_det.geometry.box import TLBRBoxes
 
 class ImageBasicPreparation:
 
-    def __init__(self, min_scale, max_scale, target_shape):
+    def __init__(self, overlap_percentage, min_scale, max_scale, target_shape):
         self.min_scale = min_scale
         self.max_scale = max_scale
         self.target_shape = target_shape
+        self.overlap_percantage = overlap_percentage
 
     def scale_and_random_crop(self, image, bbox, labels):
         """bboxes must be unnormalised!"""
@@ -40,8 +41,8 @@ class ImageBasicPreparation:
 
         offset = crop_tlbr[:2]
         cropped_boxes.add_offset(-offset)
+        valid_boxes = (cropped_boxes.box_area()/boxes.box_area()) > self.overlap_percantage
         cropped_boxes.normalise(self.target_shape, self.target_shape)
-        valid_boxes = cropped_boxes.box_area() > 0
         cropped_boxes = cropped_boxes.boolean_mask(valid_boxes)
         cropped_labels = tf.boolean_mask(labels, valid_boxes)
         return cropped_boxes, cropped_labels
@@ -62,7 +63,7 @@ class ImageBasicPreparation:
         to_pad_0 = to_pad // 2
         to_pad_1 = to_pad - to_pad_0
         to_pad = tf.stack([to_pad_0, to_pad_1], axis=-1)
-        image = tf.pad(image, to_pad)
+        image = tf.pad(image, to_pad, mode='CONSTANT', constant_values=tf.reduce_mean(image))
 
         # need to incorporate the padding for the boxes
         boxes = TLBRBoxes(bbox)
