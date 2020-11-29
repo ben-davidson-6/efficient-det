@@ -5,7 +5,7 @@ Wanted to implement an object detection pipeline from scratch.
 Below are the best results so far. They are not good because:
 - I cut training short as tracking the val loss and saving best weights is not a good idea
     - I need to add some better end of epoch evaluation
-- This takes forever to train. I was at 4 days and still wasn't converging
+- This takes forever to train. I was at 4 days and still hadn't converged.
 
 
 ```

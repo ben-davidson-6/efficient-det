@@ -37,7 +37,7 @@ class EfficientDetNetwork(tf.keras.Model):
         x = self.channel_normaliser(x, training)
         x = self.bifpn(x, training)
         x = self.detection_head(x, training)
-        [tf.debugging.check_numerics(y, 'Found nans in output of model', name=None) for y in x]
+        # [tf.debugging.check_numerics(y, 'Found nans in output of model', name=None) for y in x]
         return x
 
     def get_backbone(self):

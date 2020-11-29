@@ -21,7 +21,7 @@ class Backbone(tf.keras.layers.Layer):
     @staticmethod
     def application_selector(phi):
         if phi == 0:
-            return tf.keras.applications.EfficientNetB0, (164, 236)#(77, 164, 236)
+            return tf.keras.applications.EfficientNetB0, (77, 164, 236)
         elif phi == 1:
             return tf.keras.applications.EfficientNetB1, (119, 236, 338)
         elif phi == 2:
