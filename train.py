@@ -43,7 +43,7 @@ num_classes = 1
 efficient_det = model.EfficientDetNetwork(phi, num_classes, anchors, n_extra_downsamples=3)
 
 # loss
-loss_weights = tf.constant([1., 0.])
+loss_weights = tf.constant([1., 1.])
 gamma = 1.5
 delta = 0.1
 alpha = 0.75
@@ -92,8 +92,6 @@ cbs = [save_best_model, save_most_recent_model, tensorboard_vis]
 efficient_det.fit(
     dataset.training_set(),
     validation_data=dataset.validation_set(),
-    steps_per_epoch=100,
-    validation_steps=100,
     epochs=300,
     callbacks=cbs,
     verbose=0
