@@ -10,7 +10,7 @@ class EfficientDetLoss(tf.keras.losses.Loss):
         self.gamma = gamma
         self.weights = weights
         self.n_classes = n_classes
-        self.huber_loss = tf.keras.losses.Huber(delta)
+        self.delta = delta
 
     def call(self, y_true, y_pred, sample_weight=None):
         """
@@ -28,13 +28,16 @@ class EfficientDetLoss(tf.keras.losses.Loss):
         -------
 
         """
-
         y_true_class, y_true_regression = tf.cast(y_true[..., 0], tf.int32), y_true[..., 1:]
         y_pred_class, y_pred_regression = y_pred[..., :self.n_classes], y_pred[..., self.n_classes:]
         non_background, num_positive = EfficientDetLoss._calculate_mask_and_normaliser(y_true_class)
-        fl = self.focal_loss(y_true_class, y_pred_class)*self.weights[0]/num_positive[..., None]
-        bl = self.huber_loss(y_true_regression, y_pred_regression, non_background/num_positive)*self.weights[1]
+        fl = self.focal_loss(y_true_class, y_pred_class) * self.weights[0] / num_positive[..., None]
+        bl = self.huber_loss(y_true_regression, y_pred_regression) * self.weights[1] * non_background / num_positive
         return fl + bl
+
+    def huber_loss(self, y_true, y_pred):
+        print(y_true, y_pred)
+        return tf.compat.v1.losses.huber_loss(y_true, y_pred, delta=self.delta)
 
     @staticmethod
     def _calculate_mask_and_normaliser(y_true_class):

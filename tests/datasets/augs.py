@@ -23,7 +23,7 @@ def single_example():
 
 
 def test_does_nothing(single_example):
-    prepper = efficient_det.datasets.train_data_prep.ImageBasicPreparation(min_scale=1., max_scale=1., target_shape=64)
+    prepper = efficient_det.datasets.train_data_prep.ImageBasicPreparation(overlap_percentage=0.3, min_scale=1., max_scale=1., target_shape=64)
     image, bboxes, labels = prepper.scale_and_random_crop(*single_example)
     assert labels.shape == single_example[2].shape
     assert bboxes.shape == single_example[1].shape
@@ -54,7 +54,7 @@ def test_augmenting_looks_good(random_example_in_image, plt):
     plt.subplot(2, 1, 1)
     plt.imshow(draw_image_with_boxes(image, bboxes))
     for k in range(3):
-        prepper = efficient_det.datasets.train_data_prep.ImageBasicPreparation(min_scale=0.5, max_scale=2., target_shape=512)
+        prepper = efficient_det.datasets.train_data_prep.ImageBasicPreparation(overlap_percentage=0.3, min_scale=0.5, max_scale=2., target_shape=512)
         image_mod, bboxes_mod, labels_mod = prepper.scale_and_random_crop(image, bboxes, labels)
         plt.subplot(2, 3, 4 + k)
         plt.imshow(draw_image_with_boxes(image_mod, bboxes_mod))

@@ -18,7 +18,7 @@ def coco():
     ]
     iou_match_thresh = 0.3
     anchors = anch.build_anchors(anchor_size, num_levels=3, aspects=anchor_aspects)
-    prepper = train_data_prep.ImageBasicPreparation(min_scale=0.8, max_scale=1.5, target_shape=512)
+    prepper = train_data_prep.ImageBasicPreparation(overlap_percentage=0.3, min_scale=0.8, max_scale=1.5, target_shape=512)
     return efficient_det.datasets.coco.Coco(
         anchors=anchors,
         augmentations=None,
