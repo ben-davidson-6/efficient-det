@@ -39,7 +39,7 @@ class Dataset:
     def validation_set(self):
         ds = self._raw_validation_set()
         ds = ds.map(self.validation_transform, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-        ds = ds.batch(4).prefetch(tf.data.experimental.AUTOTUNE)
+        ds = ds.batch(1).prefetch(tf.data.experimental.AUTOTUNE)
         return ds
 
     @tf.function

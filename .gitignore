@@ -1,5 +1,6 @@
 venv/
 .idea/
-logs/
+artifacts/
 authorized_keys
 *.pyc
+TEST_PLOTS/

@@ -33,6 +33,7 @@ class EfficientDetLoss(tf.keras.losses.Loss):
         non_background, num_positive = EfficientDetLoss._calculate_mask_and_normaliser(y_true_class)
         fl = self.focal_loss(y_true_class, y_pred_class) * self.weights[0] / num_positive
         bl = self.huber_loss(y_true_regression, y_pred_regression) * self.weights[1] * non_background / (4*num_positive)
+        tf.debugging.check_numerics(bl, 'b')
         return tf.reduce_sum(fl) + tf.reduce_sum(bl)
 
     def huber_loss(self, y_true, y_pred):

@@ -63,9 +63,10 @@ if __name__ == '__main__':
         batch_size=1)
 
     k = 1
-    for x in dataset._raw_training_set():
-        print(x)
+    import numpy as np
+    for x in dataset._raw_validation_set():
+        print(np.any(np.isnan(x[0].numpy())))
         k += 1
-        if k == 5:
+        if k == 10:
 
             break

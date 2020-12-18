@@ -119,7 +119,8 @@ class CentroidWidthBoxes(Boxes):
         centroid_other, dimensions_other = tf.split(other.tensor, num_or_size_splits=2, axis=-1)
         centroid_self, dimensions_self = tf.split(self.tensor, num_or_size_splits=2, axis=-1)
         offset = (centroid_self - centroid_other)/dimensions_other
-        scale = tf.math.log(dimensions_self/dimensions_other)
+        scale = tf.maximum(dimensions_self/dimensions_other, tf.keras.backend.epsilon())
+        scale = tf.math.log(scale)
         offset_boxes = tf.concat([offset, scale], axis=-1)
         if as_original_shape:
             offset_boxes = tf.reshape(offset_boxes, self.original_shape)
