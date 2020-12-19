@@ -67,7 +67,8 @@ dataset = faces.Faces(
 
 # training loop
 time = datetime.datetime.utcnow().strftime('%h_%d_%H%M%S')
-adam = tf.keras.optimizers.Adam(learning_rate=0.001)
+adam = tf.keras.optimizers.Adam(learning_rate=0.001,)
+
 metrics = [model.ClassAccuracy(num_classes)]
 efficient_det.compile(optimizer=adam, loss=loss, metrics=metrics)
 save_best_model = tf.keras.callbacks.ModelCheckpoint(
