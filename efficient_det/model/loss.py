@@ -1,4 +1,5 @@
 import tensorflow as tf
+import tensorflow_addons as tfa
 
 from efficient_det import NO_CLASS_LABEL
 
@@ -11,6 +12,11 @@ class EfficientDetLoss(tf.keras.losses.Loss):
         self.weights = weights
         self.n_classes = n_classes
         self.delta = delta
+        self.focal_loss = tfa.losses.SigmoidFocalCrossEntropy(
+            from_logits=True,
+            alpha=alpha,
+            gamma=gamma
+        )
 
     def call(self, y_true, y_pred, sample_weight=None):
         """
@@ -28,12 +34,12 @@ class EfficientDetLoss(tf.keras.losses.Loss):
         -------
 
         """
+        b_size = tf.cast(tf.shape(y_true)[0], tf.float32)
         y_true_class, y_true_regression = tf.cast(y_true[..., 0], tf.int32), y_true[..., 1:]
         y_pred_class, y_pred_regression = y_pred[..., :self.n_classes], y_pred[..., self.n_classes:]
         non_background, num_positive = EfficientDetLoss._calculate_mask_and_normaliser(y_true_class)
-        fl = self.focal_loss(y_true_class, y_pred_class) * self.weights[0] / num_positive
-        bl = self.huber_loss(y_true_regression, y_pred_regression) * self.weights[1] * non_background / (4*num_positive)
-        tf.debugging.check_numerics(bl, 'b')
+        fl = self.focal_loss(y_true_class, y_pred_class) * self.weights[0] / (num_positive * b_size)
+        bl = self.huber_loss(y_true_regression, y_pred_regression) * self.weights[1] * non_background / ((4*num_positive)*b_size)
         return tf.reduce_sum(fl) + tf.reduce_sum(bl)
 
     def huber_loss(self, y_true, y_pred):

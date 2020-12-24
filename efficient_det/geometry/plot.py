@@ -7,7 +7,7 @@ def draw_model_output(image, boxes, scores, thresh):
     image = tf.cast(image, tf.uint8)
     to_show = scores > thresh
 
-    box = tf.where(to_show[..., None], boxes, -1.)
+    box = tf.where(to_show[..., None], boxes, 0.)
     image = tf.image.draw_bounding_boxes(
         tf.image.convert_image_dtype(image, tf.float32),
         box,

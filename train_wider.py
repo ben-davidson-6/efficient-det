@@ -1,13 +1,11 @@
 import os
-os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 os.environ['PATH'] += ';C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v10.1\\extras\\CUPTI\\lib64'
-os.environ['TF_GPU_THREAD_MODE'] = 'gpu_private'
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-
+import numpy as np
 import efficient_det.model as model
 import efficient_det.datasets.wider_face as faces
 import efficient_det.datasets.train_data_prep as train_data_prep
 import tensorflow as tf
+import tensorflow_addons as tfa
 import datetime
 
 # todo
@@ -20,16 +18,26 @@ import datetime
 #   move to conda and setup environment
 #   the number of levels is a bit esoteric for the anchors
 #       it has to match up with the downampling of the model
+#   at least one match
 
 # anchors
-anchor_size = 2
+anchor_size = 2.
+# aspects = [
+#     1.,
+#     1.75803925,
+#     2.37142873,
+#     1.10344524,
+#     3.74873472]
+
+# ws = np.linspace(0.5, 1., 5)
+# base_aspects = [(w*x, w) for x, w in zip(aspects, ws)]
 base_aspects = [
     (1., 1.),
-    (.75, 1.5),
-    (1.5, 0.75),
+    (1.5, 1.5/2.0),
+    (1.75, 1.75/3.0)
 ]
 aspects = []
-n_octave = 2
+n_octave = 6
 for octave in range(n_octave):
     scale = 2**(octave / n_octave)
     for aspect in base_aspects:
@@ -43,7 +51,7 @@ num_classes = 1
 efficient_det = model.EfficientDetNetwork(phi, num_classes, anchors, n_extra_downsamples=3)
 
 # loss
-loss_weights = tf.constant([1., 1.])
+loss_weights = tf.constant([1., 20.])
 gamma = 1.5
 delta = 0.1
 alpha = 0.75
@@ -55,7 +63,7 @@ overlap_for_crop = 0.3
 prepper = train_data_prep.ImageBasicPreparation(
     min_scale=0.8,
     overlap_percentage=overlap_for_crop,
-    max_scale=1.5,
+    max_scale=1.2,
     target_shape=512)
 
 dataset = faces.Faces(
@@ -63,36 +71,17 @@ dataset = faces.Faces(
     augmentations=None,
     basic_training_prep=prepper,
     iou_thresh=iou_match_thresh,
-    batch_size=5)
+    batch_size=16)
 
 # training loop
 time = datetime.datetime.utcnow().strftime('%h_%d_%H%M%S')
-adam = tf.keras.optimizers.Adam(learning_rate=0.001,)
-
-metrics = [model.ClassAccuracy(num_classes)]
-efficient_det.compile(optimizer=adam, loss=loss, metrics=metrics)
-save_best_model = tf.keras.callbacks.ModelCheckpoint(
-    f'./artifacts/models/{time}/best_model',
-    monitor='val_loss',
-    verbose=0,
-    save_best_only=True,
-    save_weights_only=True,
-    mode='auto',
-    save_freq='epoch')
-save_most_recent_model = tf.keras.callbacks.ModelCheckpoint(
-    f'./artifacts/models/{time}/best_model',
-    monitor='val_loss',
-    verbose=0,
-    save_best_only=False,
-    save_weights_only=True,
-    mode='auto',
-    save_freq='epoch')
-
-tensorboard_vis = model.TensorboardCallback(dataset.training_set(), dataset.validation_set(), f'./artifacts/logs/{time}')
-cbs = [save_best_model, save_most_recent_model, tensorboard_vis]
+radam = tfa.optimizers.RectifiedAdam()
+ranger = tfa.optimizers.Lookahead(radam, sync_period=6, slow_step_size=0.5)
+efficient_det.compile(optimizer=ranger, loss=loss)
+tensorboard_vis = model.TensorboardCallback(dataset, f'./artifacts/{time}', draw_first=False)
+cbs = [tensorboard_vis]
 efficient_det.fit(
     dataset.training_set(),
-    validation_data=dataset.validation_set(),
     epochs=300,
     callbacks=cbs,
     verbose=0

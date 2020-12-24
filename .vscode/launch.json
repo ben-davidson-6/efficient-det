@@ -1,0 +1,16 @@
+{
+  "configurations": [
+    {
+      "name": "Python: Current File",
+      "type": "python",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "env": {
+        "TF_FORCE_GPU_ALLOW_GROWTH": "true",
+        "TF_GPU_THREAD_MODE": "gpu_private"
+      }
+    }
+  ],
+}

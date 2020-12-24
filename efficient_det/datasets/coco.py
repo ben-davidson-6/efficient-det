@@ -20,7 +20,13 @@ class Coco(efficient_det.datasets.dataset.Dataset):
 
     @staticmethod
     def validation_set_for_final_eval():
-        return Coco.raw_dataset(Coco.validation)
+        def mold_for_final(x):
+            image = x['image']
+            image = tf.image.resize(image, (512, 512))
+            bbox = x['objects']['bbox']
+            labels = x['objects']['label']
+            return image, {'bboxes': bbox, 'labels': labels, 'image_id': x['image/id']}
+        return Coco.raw_dataset(Coco.validation).map(mold_for_final)
 
     @staticmethod
     def get_image_box_label(example):
@@ -38,6 +44,8 @@ class Coco(efficient_det.datasets.dataset.Dataset):
             split=split,
             shuffle_files=shuffle)
 
+    def categories(self):
+        pass
 
 if __name__ == '__main__':
 

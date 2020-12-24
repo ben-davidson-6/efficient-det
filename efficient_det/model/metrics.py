@@ -1,12 +1,12 @@
 import tensorflow as tf
 
 
-class ClassAccuracy(tf.keras.metrics.Metric):
+class ClassPrecision(tf.keras.metrics.Metric):
     def __init__(self, num_classes):
         # only works for binary
         self.precision = tf.keras.metrics.Precision()
         self.num_classes = num_classes
-        super(ClassAccuracy, self).__init__(name='precision')
+        super(ClassPrecision, self).__init__(name='precision')
 
     def update_state(self, y_true, y_pred, sample_weight=None):
         y_true = tf.cast(y_true[..., 0], tf.int64)
@@ -22,7 +22,6 @@ class ClassAccuracy(tf.keras.metrics.Metric):
 
     def get_config(self):
         return {'num_classes': self.num_classes}
-
 
 
 if __name__ == '__main__':

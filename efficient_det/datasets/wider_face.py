@@ -18,10 +18,28 @@ class Faces(efficient_det.datasets.dataset.Dataset):
         ds = ds.map(Faces.get_image_box_label)
         return ds
 
-    @staticmethod
-    def validation_set_for_final_eval():
-        return Faces.raw_dataset(Faces.validation)
+    def validation_set_for_final_eval(self, ):
+        
+        def mold_for_eval(x):
+            bbox = x['faces']['bbox']
+            image = tf.image.resize(x['image'], (512, 512))
+            labels = tf.zeros_like(bbox, dtype=tf.int32)[:, 0]
+            return (image, {'labels': labels, 'bboxes': bbox})
 
+        ds = Faces.raw_dataset(Faces.validation).map(mold_for_eval)
+
+        def gen():
+            for image_id, (image, info) in enumerate(ds):
+                info['image_id'] = image_id + 1
+                yield (image, info)
+
+        return tf.data.Dataset.from_generator(
+            gen,
+            output_types=(tf.float32, {'labels': tf.int32, 'bboxes': tf.float32, 'image_id': tf.int32}))
+
+    def categories(self):
+        return [{'id': 1, 'name': 'face'}]
+        
     @staticmethod
     def get_image_box_label(example):
         bbox = example['faces']['bbox']
@@ -32,11 +50,18 @@ class Faces(efficient_det.datasets.dataset.Dataset):
     @staticmethod
     def raw_dataset(split) -> tf.data.Dataset:
         shuffle = split == Faces.train
+        def throw_away_invalid(x):
+            bbox = x['faces']['bbox']
+            width = bbox[:, 3] - bbox[:, 1]
+            height = bbox[:, 2] - bbox[:, 0]
+            ok = tf.logical_and(height > 0, width > 0)
+            x['faces']['bbox'] = bbox[ok]
+            return x
         return tfds.load(
             NAME,
             download=False,
             split=split,
-            shuffle_files=shuffle)
+            shuffle_files=shuffle).map(throw_away_invalid)
 
 
 if __name__ == '__main__':
@@ -64,9 +89,16 @@ if __name__ == '__main__':
 
     k = 1
     import numpy as np
-    for x in dataset._raw_validation_set():
-        print(np.any(np.isnan(x[0].numpy())))
-        k += 1
-        if k == 10:
-
-            break
+    boxes = []
+    invalid = []
+    for x, g in dataset.validation_set_for_final_eval():
+        shape = np.array(x.shape[:2])
+        shape = np.concatenate([shape, shape])[None]
+        boxes.append(g['bboxes'].numpy()*shape)
+        invalid.append(g['invalid'].numpy())
+    invalid = np.concatenate(invalid, axis=0)
+    print(np.sum(invalid))
+    print(np.sum(~invalid))
+    print(np.sum(invalid)/np.sum(~invalid))
+    boxes = np.concatenate(boxes, axis=0)
+    np.save('boxes', boxes)

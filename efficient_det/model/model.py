@@ -1,4 +1,4 @@
-# import os
+import os
 # print('delet me')
 # os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 # os.environ['PATH'] += ';C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v10.1\\extras\\CUPTI\\lib64'
@@ -15,6 +15,10 @@ from efficient_det.model.components.detection_head import DetectionHead
 
 
 class EfficientDetNetwork(tf.keras.Model):
+    # should be 3 but memory
+    base_repeats = 3
+    # should be 64 but memory
+    base_depth = 64
 
     def __init__(self, phi, num_classes, anchors, n_extra_downsamples=2):
         # todo could validate num levels here
@@ -32,7 +36,10 @@ class EfficientDetNetwork(tf.keras.Model):
 
     def call(self, x, training=None, mask=None):
         # todo add make sure is sufficiently even
-        x = self.backbone(x, training)
+
+        # training is false to turn off batch norm updates to
+        # mean and var always
+        x = self.backbone(x, training=False)
         x = self.downsampler(x, training)
         x = self.channel_normaliser(x, training)
         x = self.bifpn(x, training)
@@ -45,11 +52,12 @@ class EfficientDetNetwork(tf.keras.Model):
 
     def get_bifpn(self):
         depth = self.get_bifpn_depth()
-        repeats = 3 + self.phi
+        repeats = EfficientDetNetwork.base_repeats + self.phi
         return BiFPN(depth, repeats)
 
     def get_detection_head(self):
-        repeats = 3 + int(math.floor(self.phi))
+        # should be 3
+        repeats = EfficientDetNetwork.base_repeats + int(math.floor(self.phi))
         return DetectionHead(self.num_classes, self.num_anchors, repeats)
 
     def get_downsampler(self):
@@ -59,7 +67,7 @@ class EfficientDetNetwork(tf.keras.Model):
         return ChannelNormaliser(depth=self.get_bifpn_depth(), n_extra=self.n_extra_downsample)
 
     def get_bifpn_depth(self):
-        return int(64*(1.35**self.phi))
+        return int(EfficientDetNetwork.base_depth*(1.35**self.phi))
 
 
 class PostProcessor:
@@ -76,9 +84,9 @@ class PostProcessor:
         tlbr, probs, labels, valid_detections = tf.image.combined_non_max_suppression(
             tlbr,
             probs,
-            max_output_size_per_class=50,
+            max_output_size_per_class=100,
             max_total_size=100,
-            score_threshold=0.01)
+            score_threshold=0.1)
         labels = tf.cast(labels, tf.int32)
         return tlbr, probs, labels, valid_detections
 
@@ -135,6 +143,7 @@ class InferenceEfficientNet(tf.keras.models.Model):
         self.efficient_det = efficient_det
         self.post_processor = PostProcessor(efficient_det.anchors, self.efficient_det.num_classes)
 
+    @tf.function
     def call(self, x, training=None, mask=None):
         model_out = self.efficient_det(x, training)
         boxes, score, label, valid_detections = self.post_processor.process_output(model_out)
@@ -142,48 +151,3 @@ class InferenceEfficientNet(tf.keras.models.Model):
 
     def process_ground_truth(self, y_true):
         return self.post_processor.ground_truth_to_flat_tlbr_label(y_true)
-
-
-
-
-
-if __name__ == '__main__':
-    import efficient_det.model as model
-    import efficient_det.datasets.coco as coco
-    import matplotlib.pyplot as plt
-    from efficient_det.geometry.plot import draw_model_output
-
-    anchor_size = 4
-    base_aspects = [
-        (1., 1.),
-        (.75, 1.5),
-        (1.5, 0.75),
-    ]
-    aspects = []
-    for octave in range(3):
-        scale = 2 ** (octave / 3)
-        for aspect in base_aspects:
-            aspects.append((aspect[0] * scale, aspect[1] * scale))
-
-    anchors = model.build_anchors(anchor_size, num_levels=5, aspects=aspects)
-
-    dataset = coco.Coco(
-        anchors=anchors,
-        augmentations=None,
-        basic_training_prep=None,
-        iou_thresh=0.1,
-        batch_size=4)
-
-    # network
-    phi = 0
-    num_classes = 80
-    efficient_det = model.EfficientDetNetwork(phi, num_classes, anchors)
-    efficient_det.load_weights('C:\\Users\\bne\\PycharmProjects\\efficient-det\\artifacts\\models\\Nov_12_192003\\model')
-
-    inference_model = InferenceEfficientNet(efficient_det)
-    for x, y in dataset.validation_set():
-        box, score, label, valid_detections = inference_model(x, training=False)
-        # inference_model.process_ground_truth(y)
-        image = draw_model_output(x, box, score, 0.5)
-        plt.imshow(image[0])
-        plt.show()

@@ -1,8 +1,10 @@
 import tensorflow as tf
 import pathlib
+import numpy as np
 
 from efficient_det.geometry.plot import draw_model_output
 from efficient_det.model.model import InferenceEfficientNet
+from efficient_det.model.coco_evaluation import CocoEvaluation
 
 
 class TensorboardCallback(tf.keras.callbacks.Callback):
@@ -10,13 +12,21 @@ class TensorboardCallback(tf.keras.callbacks.Callback):
     VALIDATION_NAME = 'val'
     TRAINING_NAME = 'train'
     IMAGE_SIZE = 256
+    FULL_EVAL_FREQ = 1
 
-    def __init__(self, training_set: tf.data.Dataset, validation_set: tf.data.Dataset, logdir: str):
+    def __init__(self, dataset, logdir: str, coco_parmas: dict = {}, is_coco: bool = False, draw_first: bool = True):
         super(TensorboardCallback, self).__init__()
         self.inference_net = None
-
-        self.validation_examples = TensorboardCallback.extract_images(validation_set)
-        self.training_examples = TensorboardCallback.extract_images(training_set)
+        self.draw_first = draw_first
+        self.logdir = logdir
+        self.best_ap = -2.0
+        self.coco_eval = CocoEvaluation(
+            dataset.validation_set_for_final_eval(),
+            dataset.categories(),
+            is_coco=is_coco,
+            coco_params=coco_parmas)
+        self.validation_examples = TensorboardCallback.extract_images(dataset.validation_set())
+        self.training_examples = TensorboardCallback.extract_images(dataset.training_set())
 
         self.train_batch_counter = tf.Variable(initial_value=0, trainable=False, dtype=tf.int64)
         self.val_batch_counter = tf.Variable(initial_value=0, trainable=False, dtype=tf.int64)
@@ -29,13 +39,6 @@ class TensorboardCallback(tf.keras.callbacks.Callback):
     def on_epoch_begin(self, epoch, logs=None):
         self._write_image_summaries(epoch)
 
-    def on_test_batch_end(self, batch, logs=None):
-        if batch%100 != 0:
-            return
-        with self.validation_writer.as_default():
-            tf.summary.scalar('loss', logs['loss'], step=self.val_batch_counter)
-            self.val_batch_counter.assign_add(1)
-
     def on_train_batch_end(self, batch, logs=None):
         if batch%100 != 0:
             return
@@ -43,15 +46,24 @@ class TensorboardCallback(tf.keras.callbacks.Callback):
             tf.summary.scalar('loss', logs['loss'], step=self.train_batch_counter)
         self.train_batch_counter.assign_add(1)
 
+    def on_test_batch_end(self, batch, logs=None):
+        pass
+        # if batch%100 != 0:
+        #     return
+        # with self.validation_writer.as_default():
+        #     tf.summary.scalar('loss', logs['loss'], step=self.val_batch_counter)
+        # self.val_batch_counter.assign_add(1)
+    
     def on_epoch_end(self, epoch, logs=None):
-        val_avg = self._average_precision(training=False, logs=logs)
-        train_avg = self._average_precision(training=True, logs=logs)
-        with self.validation_writer.as_default():
-            tf.summary.scalar('precision', val_avg, step=epoch)
-        with self.training_writer.as_default():
-            tf.summary.scalar('precision', train_avg, step=epoch)
+        if epoch%TensorboardCallback.FULL_EVAL_FREQ == 0:
+            coco = self.coco_eval.evaluate_model(self.get_net())
+            with self.validation_writer.as_default():
+                tf.summary.scalar('coco_eval', coco, step=epoch)
+            self._save_weights(coco)
 
     def _write_image_summaries(self, epoch):
+        if epoch == 0 and not self.draw_first:
+            return
         validation, training = self._build_summary_image()
         with self.validation_writer.as_default():
             tf.summary.image('examples', validation, step=epoch)
@@ -84,7 +96,7 @@ class TensorboardCallback(tf.keras.callbacks.Callback):
         examples = self._get_examples(training)
         for image, offset in examples:
             if with_model:
-                box, score, label, _ = self.get_net()(image, training=training)
+                box, score, label, _ = self.get_net()(image, training=False)
                 thresh = 0.5
             else:
                 box, score, label, _ = self.get_net().process_ground_truth(offset)
@@ -124,7 +136,12 @@ class TensorboardCallback(tf.keras.callbacks.Callback):
 
     @staticmethod
     def _make_file_writer(log_dir, name):
-        writer_loc = pathlib.Path(log_dir).joinpath(name)
+        writer_loc = pathlib.Path(log_dir).joinpath(f'logs/{name}')
         return tf.summary.create_file_writer(str(writer_loc))
 
+    def _save_weights(self, ap):
+        logdir = pathlib.Path(self.logdir).joinpath(f'model/model')
+        if ap > self.best_ap:
+            self.best_ap = ap
+            self.model.save_weights(logdir)
 
