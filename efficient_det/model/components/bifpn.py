@@ -84,7 +84,6 @@ class BiFPNLayer(tf.keras.layers.Layer):
 
 
 class BiFPNNode(tf.keras.layers.Layer):
-    eps = 1e-10
 
     def __init__(self, num_inputs, depth, upsample):
         super(BiFPNNode, self).__init__()
@@ -102,8 +101,6 @@ class BiFPNNode(tf.keras.layers.Layer):
             use_bias=False,
             activation='swish',
             padding='SAME',
-            depthwise_initializer=tf.initializers.VarianceScaling(),
-            pointwise_initializer=tf.initializers.VarianceScaling()
         )
         self.bn = tf.keras.layers.BatchNormalization()
 
@@ -121,7 +118,7 @@ class BiFPNNode(tf.keras.layers.Layer):
 
     def fuse(self, inputs):
         weights = tf.nn.relu(self.fusion_weights)
-        normaliser = tf.reduce_sum(weights) + BiFPNNode.eps
+        normaliser = tf.reduce_sum(weights) + tf.keras.backend.epsilon()
         weights /= normaliser
         weighted = [weights[i] * x for i, x in enumerate(inputs)]
         return tf.add_n(weighted)

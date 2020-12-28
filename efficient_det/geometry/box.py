@@ -118,9 +118,11 @@ class CentroidWidthBoxes(Boxes):
     def as_offset_boxes(self, other, as_original_shape=False):
         centroid_other, dimensions_other = tf.split(other.tensor, num_or_size_splits=2, axis=-1)
         centroid_self, dimensions_self = tf.split(self.tensor, num_or_size_splits=2, axis=-1)
-        offset = (centroid_self - centroid_other)/dimensions_other
-        scale = tf.maximum(dimensions_self/dimensions_other, tf.keras.backend.epsilon())
+        offset = (centroid_self - centroid_other)/(dimensions_other + tf.keras.backend.epsilon())
+        scale = dimensions_self/(dimensions_other + tf.keras.backend.epsilon())
+        scale = tf.clip_by_value(scale, 0.5, 2.0)  # ideally this should never take effect due to iou constraints
         scale = tf.math.log(scale)
+
         offset_boxes = tf.concat([offset, scale], axis=-1)
         if as_original_shape:
             offset_boxes = tf.reshape(offset_boxes, self.original_shape)
@@ -146,7 +148,7 @@ class DefaultAnchorOffsets(Boxes):
         centroid_offset, dimension_scale = tf.split(self.tensor, num_or_size_splits=2, axis=-1)
         centroid, dimension = tf.split(anchors.tensor, num_or_size_splits=2, axis=-1)
         scale = tf.exp(dimension_scale)
-        scaled_dimensions = dimension*scale
-        offset_centroids = centroid + centroid_offset*dimension
+        scaled_dimensions = (dimension + tf.keras.backend.epsilon())*scale
+        offset_centroids = centroid + centroid_offset*(dimension + tf.keras.backend.epsilon())
         offset_anchors = tf.concat([offset_centroids, scaled_dimensions], axis=-1)
         return CentroidWidthBoxes(offset_anchors, self.original_shape)

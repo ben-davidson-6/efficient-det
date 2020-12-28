@@ -23,10 +23,11 @@ class Dataset:
         self.batch_size = batch_size
         self.anchors = anchors
         self.iou_thresh = iou_thresh
-        self.augmentations = lambda x, y: (x, y) if augmentations is None else augmentations
+        self.augmentations = augmentations
 
     def training_set(self):
         ds = self._raw_training_set()
+        ds = ds.map(self.augmentations, num_parallel_calls=tf.data.experimental.AUTOTUNE)
         ds = ds.map(self.training_transform, num_parallel_calls=tf.data.experimental.AUTOTUNE)
         ds = ds.batch(self.batch_size).prefetch(tf.data.experimental.AUTOTUNE)
         # ds = ds.map(self.augmentations, num_parallel_calls=tf.data.experimental.AUTOTUNE)
@@ -38,8 +39,8 @@ class Dataset:
 
     def validation_set(self):
         ds = self._raw_validation_set()
-        ds = ds.map(self.validation_transform, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-        ds = ds.batch(1).prefetch(tf.data.experimental.AUTOTUNE)
+        ds = ds.map(self.training_transform, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+        ds = ds.batch(self.batch_size).prefetch(tf.data.experimental.AUTOTUNE)
         return ds
 
     @tf.function
@@ -60,8 +61,10 @@ class Dataset:
         offsets_ious_boxes = self.anchors.to_offset_tensors(bboxes, height, width)
         offsets, ious, matched_boxes = zip(*offsets_ious_boxes)
         labels = [tf.gather(tf.cast(labels, tf.float32), box) for box in matched_boxes]
-        ious = [x > self.iou_thresh for x in ious]
-        labels = [tf.where(iou, label, efficient_det.NO_CLASS_LABEL) for iou, label in zip(ious, labels)]
+        positive_ious = [x > self.iou_thresh for x in ious]
+        negative_ious = [x <= 0.4 for x in ious]
+        labels = [tf.where(pos_iou, label, float(efficient_det.IGNORE_LABEL)) for pos_iou, label in zip(positive_ious, labels)]
+        labels = [tf.where(neg_iou, float(efficient_det.NO_CLASS_LABEL), label) for neg_iou, label in zip(negative_ious, labels)]
         offset = tuple([tf.concat([label[..., None], offset], axis=-1) for label, offset in zip(labels, offsets)])
         return offset
 

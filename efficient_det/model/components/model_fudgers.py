@@ -5,7 +5,7 @@ import efficient_det
 class DownsampleConv(tf.keras.layers.Layer):
     def __init__(self, depth):
         super(DownsampleConv, self).__init__()
-        self.conv = tf.keras.layers.Conv2D(depth, kernel_size=2, strides=2, use_bias=False)
+        self.conv = tf.keras.layers.Conv2D(depth, kernel_size=2, strides=2, use_bias=False, activation='swish')
         self.bn = tf.keras.layers.BatchNormalization()
 
     def call(self, x, training=None):
@@ -31,7 +31,7 @@ class Downsampler(tf.keras.layers.Layer):
 class ChannelNormConv(tf.keras.layers.Layer):
     def __init__(self, depth):
         super(ChannelNormConv, self).__init__()
-        self.conv = tf.keras.layers.Conv2D(depth, kernel_size=1, strides=1, use_bias=False)
+        self.conv = tf.keras.layers.Conv2D(depth, kernel_size=1, strides=1, use_bias=False, activation='swish')
         self.bn = tf.keras.layers.BatchNormalization()
 
     def call(self, x, training=None):

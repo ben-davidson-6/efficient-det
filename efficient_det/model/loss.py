@@ -1,22 +1,21 @@
 import tensorflow as tf
 import tensorflow_addons as tfa
 
-from efficient_det import NO_CLASS_LABEL
+from efficient_det import NO_CLASS_LABEL, IGNORE_LABEL
+from efficient_det.geometry.box import CentroidWidthBoxes
 
 
 class EfficientDetLoss(tf.keras.losses.Loss):
+
     def __init__(self, alpha, gamma, delta, weights, n_classes):
         super(EfficientDetLoss, self).__init__(name='efficient_det_loss')
-        self.alpha = alpha
-        self.gamma = gamma
         self.weights = weights
         self.n_classes = n_classes
         self.delta = delta
-        self.focal_loss = tfa.losses.SigmoidFocalCrossEntropy(
-            from_logits=True,
-            alpha=alpha,
-            gamma=gamma
-        )
+        
+        self.alpha = alpha
+        self.gamma = gamma
+        self.fake_anchor_boxes = None
 
     def call(self, y_true, y_pred, sample_weight=None):
         """
@@ -34,36 +33,39 @@ class EfficientDetLoss(tf.keras.losses.Loss):
         -------
 
         """
-        b_size = tf.cast(tf.shape(y_true)[0], tf.float32)
+
         y_true_class, y_true_regression = tf.cast(y_true[..., 0], tf.int32), y_true[..., 1:]
         y_pred_class, y_pred_regression = y_pred[..., :self.n_classes], y_pred[..., self.n_classes:]
-        non_background, num_positive = EfficientDetLoss._calculate_mask_and_normaliser(y_true_class)
-        fl = self.focal_loss(y_true_class, y_pred_class) * self.weights[0] / (num_positive * b_size)
-        bl = self.huber_loss(y_true_regression, y_pred_regression) * self.weights[1] * non_background / ((4*num_positive)*b_size)
-        return tf.reduce_sum(fl) + tf.reduce_sum(bl)
+        positive_mask, training_mask, num_positive = EfficientDetLoss._calculate_mask_and_normaliser(y_true_class)
+
+        # class loss
+        fl = tfa.losses.sigmoid_focal_crossentropy(
+            tf.one_hot(y_true_class, depth=self.n_classes), 
+            y_pred_class,
+            self.alpha,
+            self.gamma,
+            from_logits=True)
+            
+        # box loss regression
+        bl = self.huber_loss(y_true_regression, y_pred_regression)
+
+        # add them all together sensibly
+        fl = fl * self.weights[0] * training_mask
+        bl = bl * self.weights[1] * positive_mask / (4 * num_positive)
+        reduction_axes = [1, 2, 3]        
+        return tf.reduce_mean(fl, axis=reduction_axes) + tf.reduce_sum(bl, axis=reduction_axes)
 
     def huber_loss(self, y_true, y_pred):
-        return tf.compat.v1.losses.huber_loss(y_true, y_pred, delta=self.delta, reduction=tf.keras.losses.Reduction.NONE)
+        bl = tf.compat.v1.losses.huber_loss(y_true, y_pred, delta=self.delta, reduction=tf.keras.losses.Reduction.NONE)
+        return tf.reduce_sum(bl, axis=-1)
 
     @staticmethod
     def _calculate_mask_and_normaliser(y_true_class):
-        non_background = y_true_class != NO_CLASS_LABEL
-        non_background = tf.cast(non_background, tf.float32)
-        num_positive_per_image = tf.maximum(tf.reduce_sum(non_background, [1, 2, 3], keepdims=True), 1.)
-        return non_background[..., None], num_positive_per_image[..., None]
-
-    def _prep_inputs_focal_loss(self, y_true, y_pred):
-        y_true = tf.one_hot(y_true, depth=self.n_classes)
-        eps = tf.keras.backend.epsilon()
-        y_pred = tf.clip_by_value(y_pred, eps, 1.0 - eps)
-        return y_true, y_pred
-
-    def focal_loss(self, y_true, y_pred):
-        y_pred_probs = tf.nn.sigmoid(y_pred)
-        y_true, y_pred_probs = self._prep_inputs_focal_loss(y_true, y_pred_probs)
-        p_t = y_true*y_pred_probs + (1. - y_true)*(1. - y_pred_probs)
-        alpha_factor = tf.ones_like(y_true) * self.alpha
-        alpha_t = y_true*alpha_factor + (1. - y_true)*(1. - alpha_factor)
-        weight = alpha_t * (1. - p_t)**self.gamma
-        ce = tf.nn.sigmoid_cross_entropy_with_logits(labels=y_true, logits=y_pred)
-        return ce*weight
+        positive_mask = y_true_class >= 0
+        positive_mask = tf.cast(positive_mask, tf.float32)
+        num_positive_per_image = tf.maximum(tf.reduce_sum(
+            positive_mask, [1, 2, 3], keepdims=True), 1.)
+            
+        # we completely ignore some pixels, those we keep are the training mask
+        training_mask = tf.cast(y_true_class != IGNORE_LABEL, tf.float32)
+        return positive_mask, training_mask, num_positive_per_image

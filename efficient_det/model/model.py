@@ -1,10 +1,3 @@
-import os
-# print('delet me')
-# os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
-# os.environ['PATH'] += ';C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v10.1\\extras\\CUPTI\\lib64'
-# os.environ['TF_GPU_THREAD_MODE'] = 'gpu_private'
-# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
 import tensorflow as tf
 import math
 
@@ -12,6 +5,7 @@ from efficient_det.model.components.backbone import Backbone
 from efficient_det.model.components.model_fudgers import Downsampler, ChannelNormaliser
 from efficient_det.model.components.bifpn import BiFPN
 from efficient_det.model.components.detection_head import DetectionHead
+from efficient_det.constants import STARTING_LEVEL
 
 
 class EfficientDetNetwork(tf.keras.Model):
@@ -25,6 +19,7 @@ class EfficientDetNetwork(tf.keras.Model):
         super(EfficientDetNetwork, self).__init__()
         self.num_classes = num_classes
         self.n_extra_downsample = n_extra_downsamples
+        self.n_levels = STARTING_LEVEL + n_extra_downsamples
         self.anchors = anchors
         self.num_anchors = len(anchors.aspects)
         self.phi = phi
@@ -35,7 +30,6 @@ class EfficientDetNetwork(tf.keras.Model):
         self.detection_head = self.get_detection_head()
 
     def call(self, x, training=None, mask=None):
-        # todo add make sure is sufficiently even
 
         # training is false to turn off batch norm updates to
         # mean and var always
@@ -44,11 +38,11 @@ class EfficientDetNetwork(tf.keras.Model):
         x = self.channel_normaliser(x, training)
         x = self.bifpn(x, training)
         x = self.detection_head(x, training)
-        # [tf.debugging.check_numerics(y, 'Found nans in output of model', name=None) for y in x]
+        [tf.debugging.check_numerics(y, 'Found nans in output of model', name=None) for y in x]
         return x
 
     def get_backbone(self):
-        return Backbone.application_factory(self.phi)
+        return Backbone(self.phi)
 
     def get_bifpn(self):
         depth = self.get_bifpn_depth()
@@ -56,9 +50,9 @@ class EfficientDetNetwork(tf.keras.Model):
         return BiFPN(depth, repeats)
 
     def get_detection_head(self):
-        # should be 3
         repeats = EfficientDetNetwork.base_repeats + int(math.floor(self.phi))
-        return DetectionHead(self.num_classes, self.num_anchors, repeats)
+        depth = self.get_bifpn_depth()
+        return DetectionHead(self.num_classes, self.num_anchors, repeats, self.n_levels, depth=depth)
 
     def get_downsampler(self):
         return Downsampler(depth=self.get_bifpn_depth(), n_extra=self.n_extra_downsample)
@@ -85,8 +79,7 @@ class PostProcessor:
             tlbr,
             probs,
             max_output_size_per_class=100,
-            max_total_size=100,
-            score_threshold=0.1)
+            max_total_size=100)
         labels = tf.cast(labels, tf.int32)
         return tlbr, probs, labels, valid_detections
 
@@ -145,7 +138,7 @@ class InferenceEfficientNet(tf.keras.models.Model):
 
     @tf.function
     def call(self, x, training=None, mask=None):
-        model_out = self.efficient_det(x, training)
+        model_out = self.efficient_det(x, False)
         boxes, score, label, valid_detections = self.post_processor.process_output(model_out)
         return boxes, score, label, valid_detections
 

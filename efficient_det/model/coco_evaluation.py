@@ -160,14 +160,18 @@ if __name__ == '__main__':
     import time
     import efficient_det.model as model
     import efficient_det.datasets.wider_face as wider_face
-    anchor_size = 2
+    import efficient_det.geometry.plot as p
+    import efficient_det.datasets.train_data_prep as prep
+    import matplotlib.pyplot as plt
+
+    anchor_size = 2.
     base_aspects = [
         (1., 1.),
-        (.75, 1.5),
-        (1.5, 0.75),
+        (0.75, 1.5),
+        (1.5, 0.75)
     ]
     aspects = []
-    n_octave = 2
+    n_octave = 3
     for octave in range(n_octave):
         scale = 2**(octave / n_octave)
         for aspect in base_aspects:
@@ -182,15 +186,23 @@ if __name__ == '__main__':
     efficient_det = model.EfficientDetNetwork(
         phi, num_classes, anchors, n_extra_downsamples=3)
     efficient_det.load_weights(
-        'C:\\Users\\bne\\PycharmProjects\\efficient-det\\artifacts\\Dec_22_180550\\model\\model')
+        'C:\\Users\\bne\\PycharmProjects\\efficient-det\\artifacts\\Dec_27_221110\\model\\model')
     inference_net = model.InferenceEfficientNet(efficient_det)
-
-    ds = wider_face.Faces(anchors, None, None, 0.5, 1)
+    prepper = prep.ImageBasicPreparation(
+        min_scale=0.5,
+        overlap_percentage=0.3,
+        max_scale=1.2,
+        target_shape=512)
+    ds = wider_face.Faces(anchors, lambda x,y,z: (x,y,z), prepper, 0.5, 1)
     coco = CocoEvaluation(
         ds.validation_set_for_final_eval(),
         ds.categories())
-    for x, _ in ds.validation_set_for_final_eval():
-        box, score, label, _ = inference_net(x, training=False)
-        dra
-    print(coco.evaluate_model(inference_net)
-          )
+    for x, _ in ds.training_set():
+        box, score, label, valid_detections = inference_net(x[:1,], training=True)
+        valid_detections = valid_detections[0]
+        box = box[:1, :valid_detections]
+        score = score[:1, :valid_detections]
+        label = label[:1, :valid_detections]
+        im = p.draw_model_output(x, box, score, thresh=0.5)
+        plt.imshow(im[0])
+        plt.show()
