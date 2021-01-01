@@ -49,30 +49,32 @@ loss = model.EfficientDetLoss(alpha, gamma, delta, loss_weights, num_classes)
 
 # dataset
 iou_match_thresh = 0.5
-overlap_for_crop = 0.3
+overlap_for_crop = 0.2
 prepper = train_data_prep.ImageBasicPreparation(
     min_scale=0.8,
     overlap_percentage=overlap_for_crop,
     max_scale=1.2,
     target_shape=512)
+augmenter = model.Augmenter()
 
 dataset = coco.Coco(
     anchors=anchors,
-    augmentations=None,
+    augmentations=augmenter,
     basic_training_prep=prepper,
     iou_thresh=iou_match_thresh,
-    batch_size=8)
+    batch_size=4)
 
 # training loop
 time = datetime.datetime.utcnow().strftime('%h_%d_%H%M%S')
 radam = tfa.optimizers.RectifiedAdam()
 ranger = tfa.optimizers.Lookahead(radam, sync_period=6, slow_step_size=0.5)
-
-efficient_det.compile(optimizer=ranger, loss=loss)
+metrics = [model.ClassPrecision(num_classes), model.AverageOffsetDiff(num_classes), model.AverageScaleDiff(num_classes)]
+efficient_det.compile(optimizer=ranger, loss=loss, metrics=metrics)
 tensorboard_vis = model.TensorboardCallback(dataset, f'./artifacts/{time}', is_coco=True)
 cbs = [tensorboard_vis]
 efficient_det.fit(
     dataset.training_set(),
+    validation_data=dataset.validation_set()
     epochs=300,
     callbacks=cbs,
     verbose=0

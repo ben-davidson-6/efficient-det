@@ -20,7 +20,7 @@ import datetime
 #       it has to match up with the downampling of the model
 
 # anchors
-anchor_size = 2.
+anchor_size = 1.
 base_aspects = [
     (1., 1.),
     (0.75, 1.5),
@@ -38,7 +38,6 @@ anchors = model.build_anchors(
     num_levels=num_levels,
     aspects=aspects)
 
-
 # network
 phi = 0
 num_classes = 1
@@ -52,7 +51,8 @@ alpha = 0.25
 loss = model.EfficientDetLoss(alpha, gamma, delta, loss_weights, num_classes)
 
 # dataset
-iou_match_thresh = 0.5
+pos_iou_match_thresh = 0.5
+neg_iou_thresh = 0.4
 overlap_for_crop = 0.2
 prepper = train_data_prep.ImageBasicPreparation(
     min_scale=0.5,
@@ -65,14 +65,16 @@ dataset = faces.Faces(
     anchors=anchors,
     augmentations=augmenter,
     basic_training_prep=prepper,
-    iou_thresh=iou_match_thresh,
+    pos_iou_thresh=pos_iou_match_thresh,
+    neg_iou_thresh=neg_iou_thresh,
     batch_size=8)
 
 # training loop
 time = datetime.datetime.utcnow().strftime('%h_%d_%H%M%S')
-optimiser = tf.optimizers.Adam()
+radam = tfa.optimizers.RectifiedAdam()
+ranger = tfa.optimizers.Lookahead(radam, sync_period=6, slow_step_size=0.5)
 metrics = [model.ClassPrecision(num_classes), model.AverageOffsetDiff(num_classes), model.AverageScaleDiff(num_classes)]
-efficient_det.compile(optimizer=optimiser, loss=loss, metrics=metrics)
+efficient_det.compile(optimizer=ranger, loss=loss, metrics=metrics)
 
 tensorboard_vis = model.TensorboardCallback(dataset, f'./artifacts/{time}')
 cbs = [tensorboard_vis]

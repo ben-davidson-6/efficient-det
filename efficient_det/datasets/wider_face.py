@@ -22,7 +22,8 @@ class Faces(efficient_det.datasets.dataset.Dataset):
         
         def mold_for_eval(x):
             bbox = x['faces']['bbox']
-            image = tf.image.resize(x['image'], (1024, 1024))
+            image = tf.image.resize(x['image'], (512, 512))
+            # image = tf.image.pad_to_bounding_box(image, 0, 0, 512, 512)
             labels = tf.zeros_like(bbox, dtype=tf.int32)[:, 0]
             return (image, {'labels': labels, 'bboxes': bbox})
 

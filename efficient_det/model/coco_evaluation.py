@@ -16,10 +16,6 @@ from pycocotools.coco import COCO
 from pprint import pprint
 
 
-
-# coco_gt = 
-# label_to_category_id = 
-
 class CocoEvaluation:
     def __init__(self, dataset, categories, coco_params={}, is_coco=False):
         self.dataset = dataset
@@ -180,29 +176,33 @@ if __name__ == '__main__':
     anchors = model.build_anchors(
         anchor_size, num_levels=num_levels, aspects=aspects)
 
-    # network
-    phi = 0
-    num_classes = 1
-    efficient_det = model.EfficientDetNetwork(
-        phi, num_classes, anchors, n_extra_downsamples=3)
-    efficient_det.load_weights(
-        'C:\\Users\\bne\\PycharmProjects\\efficient-det\\artifacts\\Dec_27_221110\\model\\model')
-    inference_net = model.InferenceEfficientNet(efficient_det)
+    
+
     prepper = prep.ImageBasicPreparation(
         min_scale=0.5,
         overlap_percentage=0.3,
         max_scale=1.2,
         target_shape=512)
-    ds = wider_face.Faces(anchors, lambda x,y,z: (x,y,z), prepper, 0.5, 1)
+    ds = wider_face.Faces(anchors, lambda x,y,z: (x,y,z), prepper, 0.5, 0.4, 1)
+    # network
+    phi = 0
+    num_classes = 1
+    efficient_det = model.EfficientDetNetwork(
+        phi, num_classes, anchors, n_extra_downsamples=3)
+    # efficient_det.load_weights(
+    #     'C:\\Users\\bne\\PycharmProjects\\efficient-det\\artifacts\\Dec_28_150139\\model\\model')
+    inference_net = model.InferenceEfficientNet(efficient_det)
     coco = CocoEvaluation(
         ds.validation_set_for_final_eval(),
-        ds.categories())
-    for x, _ in ds.training_set():
-        box, score, label, valid_detections = inference_net(x[:1,], training=True)
+        ds.categories(),
+        coco_params={'iouThrs': np.array([0.5])})
+    # coco.evaluate_model(inference_net)
+    for x, y in ds.validation_set():
+        box, score, label, valid_detections = inference_net.process_ground_truth(y)
         valid_detections = valid_detections[0]
         box = box[:1, :valid_detections]
         score = score[:1, :valid_detections]
         label = label[:1, :valid_detections]
-        im = p.draw_model_output(x, box, score, thresh=0.5)
+        im = p.draw_model_output(x, box, score, thresh=0.)
         plt.imshow(im[0])
         plt.show()
