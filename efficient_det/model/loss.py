@@ -39,18 +39,26 @@ class EfficientDetLoss(tf.keras.losses.Loss):
         positive_mask, training_mask, num_positive = EfficientDetLoss._calculate_mask_and_normaliser(y_true_class)
 
         # class loss
-        fl = tfa.losses.sigmoid_focal_crossentropy(
-            tf.one_hot(y_true_class, depth=self.n_classes), 
+        total_n = tf.reduce_sum(tf.cast(training_mask, tf.float32))
+        num_neg = (total_n - tf.reduce_sum(num_positive))
+        alpha = num_neg/total_n
+        # fl = tfa.losses.sigmoid_focal_crossentropy(
+        #     tf.one_hot(y_true_class, depth=self.n_classes), 
+        #     y_pred_class,
+        #     alpha,
+        #     0.,
+        #     from_logits=True)
+        fl = tf.nn.weighted_cross_entropy_with_logits(
+            tf.one_hot(y_true_class, depth=self.n_classes),
             y_pred_class,
-            self.alpha,
-            self.gamma,
-            from_logits=True)
-            
+            alpha,
+        )
+        fl = tf.reduce_sum(fl, axis=-1)
         # box loss regression
         bl = self.huber_loss(y_true_regression, y_pred_regression)
 
         # add them all together sensibly
-        fl = fl * self.weights[0] * training_mask / num_positive
+        fl = fl * self.weights[0] * training_mask# / num_positive
         bl = bl * self.weights[1] * positive_mask / (4 * num_positive)
         reduction_axes = [1, 2, 3]        
         return tf.reduce_mean(fl, axis=reduction_axes) + tf.reduce_sum(bl, axis=reduction_axes)
@@ -69,3 +77,9 @@ class EfficientDetLoss(tf.keras.losses.Loss):
         # we completely ignore some pixels, those we keep are the training mask
         training_mask = tf.cast(y_true_class != IGNORE_LABEL, tf.float32)
         return positive_mask, training_mask, num_positive_per_image
+
+
+if __name__ == '__main__':
+    loss = EfficientDetLoss(0.1, 0., 0.1, tf.constant([1., 1.]), 1)
+    y = tf.random.uniform([2, 2, 2, 2, 1])
+    print(loss(y, y).numpy())
