@@ -23,8 +23,8 @@ import datetime
 anchor_size = 1.
 base_aspects = [
     (1., 1.),
-    (0.75, 1.5),
-    (1.5, 0.75)
+    (0.7, 1.4),
+    (1.4, 0.7)
 ]
 aspects = []
 n_octave = 3
@@ -44,10 +44,10 @@ num_classes = 1
 efficient_det = model.EfficientDetNetwork(phi, num_classes, anchors, n_extra_downsamples=3)
 
 # loss
-loss_weights = tf.constant([1., 50.])
-gamma = 1.5
+loss_weights = tf.constant([1., 1.])
+gamma = 2.0
 delta = 0.1
-alpha = 0.25
+alpha = 0.75
 loss = model.EfficientDetLoss(alpha, gamma, delta, loss_weights, num_classes)
 
 # dataset
@@ -55,7 +55,7 @@ pos_iou_match_thresh = 0.5
 neg_iou_thresh = 0.4
 overlap_for_crop = 0.2
 prepper = train_data_prep.ImageBasicPreparation(
-    min_scale=0.5,
+    min_scale=0.8,
     overlap_percentage=overlap_for_crop,
     max_scale=1.2,
     target_shape=512)
@@ -73,7 +73,11 @@ dataset = faces.Faces(
 time = datetime.datetime.utcnow().strftime('%h_%d_%H%M%S')
 radam = tfa.optimizers.RectifiedAdam()
 ranger = tfa.optimizers.Lookahead(radam, sync_period=6, slow_step_size=0.5)
-metrics = [model.ClassPrecision(num_classes), model.AverageOffsetDiff(num_classes), model.AverageScaleDiff(num_classes)]
+metrics = [
+    model.ClassPrecision(num_classes),
+    model.ClassRecall(num_classes),
+    model.AverageOffsetDiff(num_classes),
+    model.AverageScaleDiff(num_classes)]
 efficient_det.compile(optimizer=ranger, loss=loss, metrics=metrics)
 
 tensorboard_vis = model.TensorboardCallback(dataset, f'./artifacts/{time}')

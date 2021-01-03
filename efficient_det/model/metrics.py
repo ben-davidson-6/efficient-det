@@ -27,6 +27,31 @@ class ClassPrecision(tf.keras.metrics.Metric):
         return {'num_classes': self.num_classes}
 
 
+class ClassRecall(tf.keras.metrics.Metric):
+    def __init__(self, num_classes):
+        self.recall = tf.keras.metrics.Recall()
+        self.num_classes = num_classes
+        super(ClassRecall, self).__init__(name='recall')
+
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        y_true = tf.cast(y_true[..., 0], tf.int64)
+        mask = efficient_det.IGNORE_LABEL != y_true
+        y_true = tf.one_hot(y_true, depth=self.num_classes)
+        y_pred = tf.nn.sigmoid(y_pred[..., :self.num_classes])
+        y_true = tf.boolean_mask(y_true, mask)
+        y_pred = tf.boolean_mask(y_pred, mask)
+        self.recall.update_state(y_true, y_pred)
+
+    def reset_states(self):
+        self.recall.reset_states()
+
+    def result(self):
+        return self.recall.result()
+
+    def get_config(self):
+        return {'num_classes': self.num_classes}
+
+
 class AverageOffsetDiff(tf.keras.metrics.Metric):
     def __init__(self, num_classes):
         self.num_classes = num_classes

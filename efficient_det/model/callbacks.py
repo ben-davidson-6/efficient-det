@@ -60,17 +60,20 @@ class TensorboardCallback(tf.keras.callbacks.Callback):
         train_offset_err = self._averaged_metric(metric_name='offset_err', training=True, logs=logs)
         val_scale_err = self._averaged_metric(metric_name='scale_err', training=False, logs=logs)
         train_scale_err = self._averaged_metric(metric_name='scale_err', training=True, logs=logs)
+        val_recall = self._averaged_metric(metric_name='recall', training=False, logs=logs)
+        train_recall = self._averaged_metric(metric_name='recall', training=True, logs=logs)
 
         with self.validation_writer.as_default():
             tf.summary.scalar('metric/precision', val_precision, step=epoch)
             tf.summary.scalar('metric/offset_err', val_offset_err, step=epoch)
             tf.summary.scalar('metric/scale_err', val_scale_err, step=epoch)
+            tf.summary.scalar('metric/recall', val_recall, step=epoch)
 
         with self.training_writer.as_default():
             tf.summary.scalar('metric/precision', train_precision, step=epoch)
             tf.summary.scalar('metric/offset_err', train_offset_err, step=epoch)
             tf.summary.scalar('metric/scale_err', train_scale_err, step=epoch)
-
+            tf.summary.scalar('metric/recall', train_recall, step=epoch)
 
         if epoch%TensorboardCallback.FULL_EVAL_FREQ == 0 and epoch != 0:
             coco = self.coco_eval.evaluate_model(self.get_net())

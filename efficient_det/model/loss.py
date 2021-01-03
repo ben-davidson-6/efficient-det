@@ -50,7 +50,7 @@ class EfficientDetLoss(tf.keras.losses.Loss):
         bl = self.huber_loss(y_true_regression, y_pred_regression)
 
         # add them all together sensibly
-        fl = fl * self.weights[0] * training_mask
+        fl = fl * self.weights[0] * training_mask / num_positive
         bl = bl * self.weights[1] * positive_mask / (4 * num_positive)
         reduction_axes = [1, 2, 3]        
         return tf.reduce_mean(fl, axis=reduction_axes) + tf.reduce_sum(bl, axis=reduction_axes)

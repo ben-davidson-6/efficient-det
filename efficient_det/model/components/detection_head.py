@@ -81,13 +81,13 @@ class FullyConnectedHead(tf.keras.layers.Layer):
 
 
 class DetectionBiasInitialiser(tf.initializers.Initializer):
-    PRIOR_FOREGROUND = 0.01
+    PRIOR_FOREGROUND = 0.05
 
     def __init__(self, n):
         self.initialisation = []
         pi = DetectionBiasInitialiser.PRIOR_FOREGROUND
         prior = -math.log((1 - pi) / pi)
-        self.initialisation = tf.ones([n])*prior + tf.random.uniform([n])*0.005
+        self.initialisation = tf.ones([n])*prior + tf.random.uniform([n])*0.01
         
     def __call__(self, shape, dtype=None):
         return self.initialisation

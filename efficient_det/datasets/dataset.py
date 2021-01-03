@@ -41,8 +41,9 @@ class Dataset:
 
     def validation_set(self):
         ds = self._raw_validation_set()
-        ds = ds.map(self.validation_transform, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-        ds = ds.batch(self.batch_size)#.prefetch(tf.data.experimental.AUTOTUNE)
+        # todo fix this scale issue
+        ds = ds.map(self.training_transform, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+        ds = ds.batch(self.batch_size).prefetch(tf.data.experimental.AUTOTUNE)
         return ds
 
     @tf.function
@@ -66,9 +67,9 @@ class Dataset:
         positive_ious = [x > self.pos_iou_thresh for x in ious]
         n_boxes = tf.shape(bboxes.get_tensor())[0]
         forced_matches = self._forced_matches(n_boxes, matched_boxes, ious)
-        
+
         positive_ious = [tf.logical_or(p, forced_match) for p, forced_match in zip(positive_ious, forced_matches)]
-        negative_ious = [tf.logical_and(x <= self.neg_iou_thresh, tf.logical_not(p)) for x, p in zip(ious, positive_ious)]
+        negative_ious = [x <= self.neg_iou_thresh for x in ious]
         labels = [tf.where(pos_iou, label, float(efficient_det.IGNORE_LABEL)) for pos_iou, label in zip(positive_ious, labels)]
         labels = [tf.where(neg_iou, float(efficient_det.NO_CLASS_LABEL), label) for neg_iou, label in zip(negative_ious, labels)]
         offset = tuple([tf.concat([label[..., None], offset], axis=-1) for label, offset in zip(labels, offsets)])
