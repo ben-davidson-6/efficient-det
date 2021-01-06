@@ -12,7 +12,7 @@ class TensorboardCallback(tf.keras.callbacks.Callback):
     VALIDATION_NAME = 'val'
     TRAINING_NAME = 'train'
     IMAGE_SIZE = 512
-    FULL_EVAL_FREQ = 10
+    FULL_EVAL_FREQ = 5
 
     def __init__(self, dataset, logdir: str, coco_parmas: dict = {}, is_coco: bool = False, draw_first: bool = True):
         super(TensorboardCallback, self).__init__()
@@ -165,7 +165,8 @@ class TensorboardCallback(tf.keras.callbacks.Callback):
         return tf.summary.create_file_writer(str(writer_loc))
 
     def _save_weights(self, ap):
-        logdir = pathlib.Path(self.logdir).joinpath(f'model/model')
+        logdir_model = pathlib.Path(self.logdir).joinpath('model/weights')
         if ap > self.best_ap:
             self.best_ap = ap
-            self.model.save_weights(logdir)
+            self.model.save_weights(logdir_model)
+

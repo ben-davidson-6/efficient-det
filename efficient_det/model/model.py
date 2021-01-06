@@ -8,10 +8,8 @@ from efficient_det.model.components.detection_head import DetectionHead
 from efficient_det.constants import STARTING_LEVEL
 
 
-class EfficientDetNetwork(tf.keras.Model):
-    # should be 3 but memory
+class EfficientDetNetwork(tf.keras.models.Model):
     base_repeats = 3
-    # should be 64 but memory
     base_depth = 64
 
     def __init__(self, phi, num_classes, anchors, n_extra_downsamples=2):
@@ -22,7 +20,7 @@ class EfficientDetNetwork(tf.keras.Model):
         self.n_levels = STARTING_LEVEL + n_extra_downsamples
         self.anchors = anchors
         self.num_anchors = len(anchors.aspects)
-        self.phi = phi
+        self.phi = phi if type(phi) == int else 0
         self.backbone = self.get_backbone()
         self.downsampler = self.get_downsampler()
         self.channel_normaliser = self.get_channel_normaliser()
@@ -30,7 +28,6 @@ class EfficientDetNetwork(tf.keras.Model):
         self.detection_head = self.get_detection_head()
 
     def call(self, x, training=None, mask=None):
-
         # training is false to turn off batch norm updates to
         # mean and var always
         x = self.backbone(x, training=False)
@@ -38,7 +35,6 @@ class EfficientDetNetwork(tf.keras.Model):
         x = self.channel_normaliser(x, training)
         x = self.bifpn(x, training)
         x = self.detection_head(x, training)
-        [tf.debugging.check_numerics(y, 'Found nans in output of model', name=None) for y in x]
         return x
 
     def get_backbone(self):
@@ -144,3 +140,7 @@ class InferenceEfficientNet(tf.keras.models.Model):
 
     def process_ground_truth(self, y_true):
         return self.post_processor.ground_truth_to_flat_tlbr_label(y_true)
+
+
+if __name__ == '__main__':
+    pass

@@ -75,8 +75,7 @@ class FullyConnectedHead(tf.keras.layers.Layer):
             kernel_size=3,
             use_bias=True,
             padding='SAME',
-            activation='swish',
-            dtype=tf.float32,
+            activation='swish'
         )
 
 

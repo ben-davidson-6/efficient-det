@@ -49,6 +49,8 @@ class Backbone(tf.keras.layers.Layer):
             return tf.keras.applications.EfficientNetB6, (221, 458, 665)
         elif phi == 7:
             return tf.keras.applications.EfficientNetB7, (263, 560, 812)
+        elif phi == 'mobile_net':
+            return tf.keras.applications.MobileNetV2, (57, 119, 154)
 
 
 if __name__ == '__main__':

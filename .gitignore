@@ -4,3 +4,4 @@ artifacts/
 authorized_keys
 *.pyc
 TEST_PLOTS/
+.pytest_cache/

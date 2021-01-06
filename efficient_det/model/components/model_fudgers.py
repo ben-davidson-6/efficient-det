@@ -22,10 +22,11 @@ class Downsampler(tf.keras.layers.Layer):
 
     def call(self, x, training=None):
         y = x[-1]
+        extra = []
         for downsample in self.downsamplers:
             y = downsample(y, training)
-            x.append(y)
-        return x
+            extra.append(y)
+        return x + extra
 
 
 class ChannelNormConv(tf.keras.layers.Layer):

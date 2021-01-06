@@ -50,6 +50,8 @@ class ClassRecall(tf.keras.metrics.Metric):
 
     def get_config(self):
         return {'num_classes': self.num_classes}
+    
+    
 
 
 class AverageOffsetDiff(tf.keras.metrics.Metric):

@@ -1,6 +1,5 @@
 import os
 os.environ['PATH'] += ';C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v10.1\\extras\\CUPTI\\lib64'
-import numpy as np
 import efficient_det.model as model
 import efficient_det.datasets.wider_face as faces
 import efficient_det.datasets.train_data_prep as train_data_prep
@@ -18,6 +17,8 @@ import datetime
 #   move to conda and setup environment
 #   the number of levels is a bit esoteric for the anchors
 #       it has to match up with the downampling of the model
+
+
 
 # anchors
 anchor_size = 1.
@@ -38,54 +39,66 @@ anchors = model.build_anchors(
     num_levels=num_levels,
     aspects=aspects)
 
-# network
-phi = 0
-num_classes = 1
-efficient_det = model.EfficientDetNetwork(phi, num_classes, anchors, n_extra_downsamples=3)
-
-# loss
-loss_weights = tf.constant([1., 1.])
-gamma = 2.0
-delta = 0.1
-alpha = 0.75
-loss = model.EfficientDetLoss(alpha, gamma, delta, loss_weights, num_classes)
-
 # dataset
 pos_iou_match_thresh = 0.5
 neg_iou_thresh = 0.4
 overlap_for_crop = 0.2
+min_scale = 0.8
+max_scale = 1.05
+target_shape = 512
+batch_size = 16
 prepper = train_data_prep.ImageBasicPreparation(
-    min_scale=0.8,
+    min_scale=min_scale,
     overlap_percentage=overlap_for_crop,
-    max_scale=1.2,
-    target_shape=512)
+    max_scale=max_scale,
+    target_shape=target_shape)
 augmenter = model.Augmenter()
-
 dataset = faces.Faces(
     anchors=anchors,
     augmentations=augmenter,
     basic_training_prep=prepper,
     pos_iou_thresh=pos_iou_match_thresh,
     neg_iou_thresh=neg_iou_thresh,
-    batch_size=8)
+    batch_size=batch_size)
+
+#  background is handled automatically so dont need + 1 here
+num_classes = 1
+
+# loss
+loss_weights = tf.constant([1., 1.])
+gamma = 2.0
+delta = 0.1
+alpha = 0.25
+loss = model.EfficientDetLoss(alpha, gamma, delta, loss_weights, num_classes)
+# using .fit will just sum the outputs, as we take the average in each loss this would
+# give disproportionate weight to the bigger boxes if we did not use loss_weights
+loss_weights = [1/(2**x) for x in range(num_levels)]
 
 # training loop
-time = datetime.datetime.utcnow().strftime('%h_%d_%H%M%S')
-radam = tfa.optimizers.RectifiedAdam()
+radam = tfa.optimizers.RectifiedAdam(learning_rate=1e-4)
 ranger = tfa.optimizers.Lookahead(radam, sync_period=6, slow_step_size=0.5)
 metrics = [
     model.ClassPrecision(num_classes),
     model.ClassRecall(num_classes),
     model.AverageOffsetDiff(num_classes),
     model.AverageScaleDiff(num_classes)]
-efficient_det.compile(optimizer=ranger, loss=loss, metrics=metrics)
 
+# network
+phi = 0
+n_extra_downsamples = num_levels - 3
+efficient_det = model.EfficientDetNetwork(phi, num_classes, anchors, n_extra_downsamples=n_extra_downsamples)
+efficient_det.compile(optimizer=ranger, loss=loss, metrics=metrics, loss_weights=loss_weights)
+
+# callback
+time = datetime.datetime.utcnow().strftime('%h_%d_%H%M%S')
 tensorboard_vis = model.TensorboardCallback(dataset, f'./artifacts/{time}')
 cbs = [tensorboard_vis]
+
+# Train!
 efficient_det.fit(
     dataset.training_set(),
     validation_data=dataset.validation_set(),
     epochs=300,
     callbacks=cbs,
-    verbose=0)
+    verbose=2)
 

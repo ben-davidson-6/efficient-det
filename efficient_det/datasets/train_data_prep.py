@@ -57,13 +57,14 @@ class ImageBasicPreparation:
         return crop_box
 
     def _pad_to_target_if_needed(self, image, bbox):
+        # todo change this to pad to bounding box
         image_dims_original = ImageBasicPreparation._image_hw(image)
         to_pad = tf.maximum(self.target_shape - image_dims_original, 0)
         to_pad = tf.concat([to_pad, tf.constant([0])], axis=0)
         to_pad_0 = to_pad // 2
         to_pad_1 = to_pad - to_pad_0
         to_pad = tf.stack([to_pad_0, to_pad_1], axis=-1)
-        image = tf.pad(image, to_pad, mode='CONSTANT', constant_values=tf.reduce_mean(image))
+        image = tf.pad(image, to_pad, mode='CONSTANT')
 
         # need to incorporate the padding for the boxes
         boxes = TLBRBoxes(bbox)

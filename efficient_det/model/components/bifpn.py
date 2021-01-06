@@ -1,4 +1,5 @@
 import tensorflow as tf
+import efficient_det
 
 
 class BiFPN(tf.keras.layers.Layer):
@@ -94,7 +95,10 @@ class BiFPNNode(tf.keras.layers.Layer):
         self.depth = depth
 
         self.resampler = self.build_resampler()
-        self.fusion_weights = tf.Variable(initial_value=tf.ones([self.num_inputs]))
+        if efficient_det.USE_MIXED:
+            self.fusion_weights = tf.Variable(initial_value=tf.ones([self.num_inputs], dtype=tf.float16))
+        else:
+            self.fusion_weights = tf.Variable(initial_value=tf.ones([self.num_inputs]))
         self.seperable_conv = tf.keras.layers.SeparableConv2D(
             depth,
             kernel_size=3,

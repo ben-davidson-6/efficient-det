@@ -32,7 +32,6 @@ class Dataset:
         ds = ds.map(self.augmentations, num_parallel_calls=tf.data.experimental.AUTOTUNE)
         ds = ds.map(self.training_transform, num_parallel_calls=tf.data.experimental.AUTOTUNE)
         ds = ds.batch(self.batch_size).prefetch(tf.data.experimental.AUTOTUNE)
-        # ds = ds.map(self.augmentations, num_parallel_calls=tf.data.experimental.AUTOTUNE)
         return ds
 
     @tf.function
@@ -69,7 +68,7 @@ class Dataset:
         forced_matches = self._forced_matches(n_boxes, matched_boxes, ious)
 
         positive_ious = [tf.logical_or(p, forced_match) for p, forced_match in zip(positive_ious, forced_matches)]
-        negative_ious = [x <= self.neg_iou_thresh for x in ious]
+        negative_ious = [tf.logical_and(x <= self.neg_iou_thresh, tf.logical_not(p)) for x, p in zip(ious, positive_ious)]
         labels = [tf.where(pos_iou, label, float(efficient_det.IGNORE_LABEL)) for pos_iou, label in zip(positive_ious, labels)]
         labels = [tf.where(neg_iou, float(efficient_det.NO_CLASS_LABEL), label) for neg_iou, label in zip(negative_ious, labels)]
         offset = tuple([tf.concat([label[..., None], offset], axis=-1) for label, offset in zip(labels, offsets)])
@@ -100,8 +99,8 @@ class Dataset:
 
     def _closest_acceptable_multiple(self, image, box, label):
         # todo hack for the time being
-        image = tf.image.resize(image, (512, 512))
-        # image = tf.image.pad_to_bounding_box(image, 0, 0, 512, 512)
+        image = tf.image.resize(image, (512, 512), preserve_aspect_ratio=True)
+        image = tf.image.pad_to_bounding_box(image, 0, 0, 512, 512)
         return image, box, label
 
     @staticmethod
