@@ -1,23 +1,9 @@
-import os
-os.environ['PATH'] += ';C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v10.1\\extras\\CUPTI\\lib64'
 import efficient_det.model as model
 import efficient_det.datasets.wider_face as faces
 import efficient_det.datasets.train_data_prep as train_data_prep
 import tensorflow as tf
 import tensorflow_addons as tfa
 import datetime
-
-# todo
-#   deal with the image shape requirements better
-#       need to have a way of forcing the shapes to be the same for down and up sampling
-#   add better training metrics
-#       ap
-#   add some seeding functionality to reproduce
-#   add augmentations
-#   move to conda and setup environment
-#   the number of levels is a bit esoteric for the anchors
-#       it has to match up with the downampling of the model
-
 
 
 # anchors
@@ -65,14 +51,11 @@ dataset = faces.Faces(
 num_classes = 1
 
 # loss
-loss_weights = tf.constant([1., 1.])
+loss_weights = [1., 1.]
 gamma = 2.0
 delta = 0.1
-alpha = 0.25
+alpha = 0.75
 loss = model.EfficientDetLoss(alpha, gamma, delta, loss_weights, num_classes)
-# using .fit will just sum the outputs, as we take the average in each loss this would
-# give disproportionate weight to the bigger boxes if we did not use loss_weights
-loss_weights = [1/(2**x) for x in range(num_levels)]
 
 # training loop
 radam = tfa.optimizers.RectifiedAdam(learning_rate=1e-4)
@@ -87,7 +70,7 @@ metrics = [
 phi = 0
 n_extra_downsamples = num_levels - 3
 efficient_det = model.EfficientDetNetwork(phi, num_classes, anchors, n_extra_downsamples=n_extra_downsamples)
-efficient_det.compile(optimizer=ranger, loss=loss, metrics=metrics, loss_weights=loss_weights)
+efficient_det.compile(optimizer=ranger, loss=loss, metrics=metrics)
 
 # callback
 time = datetime.datetime.utcnow().strftime('%h_%d_%H%M%S')
