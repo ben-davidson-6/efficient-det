@@ -60,7 +60,7 @@ class Faces(efficient_det.datasets.dataset.Dataset):
             return x
         return tfds.load(
             NAME,
-            download=False,
+            download=True,
             split=split,
             shuffle_files=shuffle).map(throw_away_invalid)
 

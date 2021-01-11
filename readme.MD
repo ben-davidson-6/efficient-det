@@ -1,24 +1,19 @@
 # EfficientDet in Tensorflow 2.3: work in progress
 
-Wanted to implement an object detection pipeline from scratch. 
-
-Below are the best results so far. They are not good because:
-- I cut training short as tracking the val loss and saving best weights is not a good idea
-    - I need to add some better end of epoch evaluation
-- This takes forever to train. I was at 4 days and still hadn't converged.
+Object detection from scratch in tensorflow 2.4. Below are the best results so far for the WiderFace dataset.
 
 
 ```
- Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.105
- Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.225
- Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.081
- Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.016
- Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.081
- Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.194
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=  1 ] = 0.138
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets= 10 ] = 0.225
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.247
- Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.038
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.273
- Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.424
+Average Precision  (AP) @[ IoU=0.50:0.50 | area=   all | maxDets=100 ] = 0.314
+Average Precision  (AP) @[ IoU=0.50:0.50 | area= small | maxDets=100 ] = 0.223
+Average Precision  (AP) @[ IoU=0.50:0.50 | area=medium | maxDets=100 ] = 0.835
+Average Precision  (AP) @[ IoU=0.50:0.50 | area= large | maxDets=100 ] = 0.926
+Average Recall     (AR) @[ IoU=0.50:0.50 | area=   all | maxDets=100 ] = 0.400
+Average Recall     (AR) @[ IoU=0.50:0.50 | area= small | maxDets=100 ] = 0.319
+Average Recall     (AR) @[ IoU=0.50:0.50 | area=medium | maxDets=100 ] = 0.907
+Average Recall     (AR) @[ IoU=0.50:0.50 | area= large | maxDets=100 ] = 0.965
 ```
+
+<div align="center">
+<img src="images/val.png" alt="validation image example" style="display: block; margin-left: auto; margin-right: auto; width: 80%;" border="10" />
+</div>

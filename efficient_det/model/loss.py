@@ -39,7 +39,7 @@ class EfficientDetLoss(tf.keras.losses.Loss):
 
         # class loss
         fl = tfa.losses.sigmoid_focal_crossentropy(
-            tf.one_hot(y_true_class, depth=self.n_classes), 
+            tf.one_hot(y_true_class, depth=self.n_classes),
             y_pred_class,
             self.alpha,
             self.gamma,

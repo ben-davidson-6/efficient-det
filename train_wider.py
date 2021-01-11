@@ -58,7 +58,7 @@ alpha = 0.75
 loss = model.EfficientDetLoss(alpha, gamma, delta, loss_weights, num_classes)
 
 # training loop
-radam = tfa.optimizers.RectifiedAdam(learning_rate=1e-4)
+radam = tfa.optimizers.RectifiedAdam()
 ranger = tfa.optimizers.Lookahead(radam, sync_period=6, slow_step_size=0.5)
 metrics = [
     model.ClassPrecision(num_classes),

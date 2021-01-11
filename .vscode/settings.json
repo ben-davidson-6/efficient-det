@@ -1,5 +1,5 @@
 {
-    "python.pythonPath": "/home/bne/miniconda3/envs/efficient_det/bin/python",
+    "python.pythonPath": "/home/ben/miniconda3/envs/efficient_det/bin/python",
     "python.linting.pylintEnabled": false,
     "python.linting.flake8Enabled": true,
     "python.linting.enabled": true,
@@ -13,7 +13,7 @@
     "python.testing.unittestEnabled": false,
     "python.testing.nosetestsEnabled": false,
     "python.testing.pytestEnabled": true,
-    "terminal.integrated.env.windows": {
+    "terminal.integrated.env.linux": {
         "PYTHONPATH": "${workspaceFolder}",
         "TF_FORCE_GPU_ALLOW_GROWTH": "true",
         "TF_GPU_THREAD_MODE": "gpu_private"
