@@ -122,8 +122,8 @@ class CentroidWidthBoxes(Boxes):
         scale = dimensions_self/(dimensions_other + tf.keras.backend.epsilon())
         scale = tf.clip_by_value(scale, 0.5, 2.0)  # ideally this should never take effect due to iou constraints
         scale = tf.math.log(scale)
-
         offset_boxes = tf.concat([offset, scale], axis=-1)
+        tf.debugging.check_numerics(offset_boxes, 'nan in data')
         if as_original_shape:
             offset_boxes = tf.reshape(offset_boxes, self.original_shape)
         return offset_boxes

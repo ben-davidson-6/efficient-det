@@ -2,7 +2,7 @@ import tensorflow as tf
 
 from efficient_det.geometry.box import DefaultAnchorBoxes, TLBRBoxes, DefaultAnchorOffsets, CentroidWidthBoxes
 from efficient_det.geometry.common import level_to_stride
-
+from efficient_det.constants import NUM_LEVELS
 
 class SingleAnchorConfig:
     def __init__(self, size, aspect):
@@ -89,8 +89,7 @@ class SingleAnchorAtLevelBuilder:
 
 
 class Anchors:
-    def __init__(self, num_levels, configs):
-        self.num_levels = num_levels
+    def __init__(self, configs):
         self.aspects = configs
         self.anchors = self._build_anchors_at_level()
 
@@ -102,12 +101,12 @@ class Anchors:
         return [a.to_offset_tensor(boxes, image_height, image_width) for a in self.anchors]
 
     def _build_anchors_at_level(self):
-        return [AnchorsAtLevel(level, self.aspects) for level in range(self.num_levels)]
+        return [AnchorsAtLevel(level, self.aspects) for level in range(NUM_LEVELS)]
 
 
-def build_anchors(size, num_levels, aspects):
+def build_anchors(size, aspects):
     configs = []
     for aspect in aspects:
         config = SingleAnchorConfig(size, tf.constant(aspect))
         configs.append(config)
-    return Anchors(num_levels, configs)
+    return Anchors(configs)

@@ -8,11 +8,11 @@ from efficient_det.model.coco_evaluation import CocoEvaluation
 
 
 class TensorboardCallback(tf.keras.callbacks.Callback):
-    MAX_EXAMPLES_PER_DATASET = 8
+    MAX_EXAMPLES_PER_DATASET = 4
     VALIDATION_NAME = 'val'
     TRAINING_NAME = 'train'
     IMAGE_SIZE = 512
-    FULL_EVAL_FREQ = 5
+    FULL_EVAL_FREQ = 10
 
     def __init__(self, dataset, logdir: str, coco_parmas: dict = {}, is_coco: bool = False, draw_first: bool = True):
         super(TensorboardCallback, self).__init__()
@@ -40,18 +40,16 @@ class TensorboardCallback(tf.keras.callbacks.Callback):
         self._write_image_summaries(epoch)
 
     def on_train_batch_end(self, batch, logs=None):
-        if batch%100 != 0:
-            return
-        with self.training_writer.as_default():
-            tf.summary.scalar('loss', logs['loss'], step=self.train_batch_counter)
-        self.train_batch_counter.assign_add(1)
+        if batch%100 == 0:
+            with self.training_writer.as_default():
+                tf.summary.scalar('loss', logs['loss'], step=self.train_batch_counter)
+            self.train_batch_counter.assign_add(1)
 
     def on_test_batch_end(self, batch, logs=None):
-        if batch%100 != 0:
-            return
-        with self.validation_writer.as_default():
-            tf.summary.scalar('loss', logs['loss'], step=self.val_batch_counter)
-        self.val_batch_counter.assign_add(1)
+        if batch%100 == 0:
+            with self.validation_writer.as_default():
+                tf.summary.scalar('loss', logs['loss'], step=self.val_batch_counter)
+            self.val_batch_counter.assign_add(1)
     
     def on_epoch_end(self, epoch, logs=None):
         val_precision = self._averaged_metric(metric_name='precision', training=False, logs=logs)
@@ -75,8 +73,8 @@ class TensorboardCallback(tf.keras.callbacks.Callback):
             tf.summary.scalar('metric/scale_err', train_scale_err, step=epoch)
             tf.summary.scalar('metric/recall', train_recall, step=epoch)
 
-        if epoch%TensorboardCallback.FULL_EVAL_FREQ == 0 and epoch != 0:
-            coco = self.coco_eval.evaluate_model(self.get_net())
+        if epoch%TensorboardCallback.FULL_EVAL_FREQ == 0 and epoch > 0:
+            coco = self.coco_eval.evaluate_model(self.inference_net)
             with self.validation_writer.as_default():
                 tf.summary.scalar('coco_eval', coco, step=epoch)
             self._save_weights(coco)
@@ -90,10 +88,9 @@ class TensorboardCallback(tf.keras.callbacks.Callback):
         with self.training_writer.as_default():
             tf.summary.image('examples', training, step=epoch)
 
-    def get_net(self):
+    def initialise_inference_net(self):
         if self.inference_net is None:
             self.inference_net = InferenceEfficientNet(self.model)
-        return self.inference_net
 
     def _draw_summary_images(self, with_model=False):
         validation = self._get_images(training=False, with_model=with_model)
@@ -114,17 +111,18 @@ class TensorboardCallback(tf.keras.callbacks.Callback):
     def _get_images(self, training, with_model):
         images = []
         examples = self._get_examples(training)
+        self.initialise_inference_net()
         for image, offset in examples:
             if with_model:
                 # todo put the valid stuff inside the inference
-                box, score, label, valid_detections = self.get_net()(image, training=False)
+                box, score, label, valid_detections = self.inference_net(image, training=False)
                 valid_detections = valid_detections[0]
                 box = box[:1, :valid_detections]
                 score = score[:1, :valid_detections]
                 label = label[:1, :valid_detections]
                 thresh = 0.5
             else:
-                box, score, label, _ = self.get_net().process_ground_truth(offset)
+                box, score, label, _ = self.inference_net.process_ground_truth(offset)
                 thresh = 0.0
             image = draw_model_output(image, box, score, thresh)
             image = tf.image.resize(image, (TensorboardCallback.IMAGE_SIZE, TensorboardCallback.IMAGE_SIZE))

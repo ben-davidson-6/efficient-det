@@ -5,19 +5,17 @@ from efficient_det.model.components.backbone import Backbone
 from efficient_det.model.components.model_fudgers import Downsampler, ChannelNormaliser
 from efficient_det.model.components.bifpn import BiFPN
 from efficient_det.model.components.detection_head import DetectionHead
-from efficient_det.constants import STARTING_LEVEL
+from efficient_det.constants import STARTING_LEVEL, NUM_LEVELS
 
 
 class EfficientDetNetwork(tf.keras.models.Model):
     base_repeats = 3
     base_depth = 64
 
-    def __init__(self, phi, num_classes, anchors, n_extra_downsamples=2):
+    def __init__(self, phi, num_classes, anchors):
         # todo could validate num levels here
         super(EfficientDetNetwork, self).__init__()
         self.num_classes = num_classes
-        self.n_extra_downsample = n_extra_downsamples
-        self.n_levels = STARTING_LEVEL + n_extra_downsamples
         self.anchors = anchors
         self.num_anchors = len(anchors.aspects)
         self.phi = phi if type(phi) == int else 0
@@ -35,6 +33,7 @@ class EfficientDetNetwork(tf.keras.models.Model):
         x = self.channel_normaliser(x, training)
         x = self.bifpn(x, training)
         x = self.detection_head(x, training)
+        [tf.debugging.check_numerics(y, message='nans in model out') for y in x]
         return x
 
     def get_backbone(self):
@@ -48,13 +47,13 @@ class EfficientDetNetwork(tf.keras.models.Model):
     def get_detection_head(self):
         repeats = EfficientDetNetwork.base_repeats + int(math.floor(self.phi))
         depth = self.get_bifpn_depth()
-        return DetectionHead(self.num_classes, self.num_anchors, repeats, self.n_levels, depth=depth)
+        return DetectionHead(self.num_classes, self.num_anchors, repeats, depth=depth)
 
     def get_downsampler(self):
-        return Downsampler(depth=self.get_bifpn_depth(), n_extra=self.n_extra_downsample)
+        return Downsampler(depth=self.get_bifpn_depth())
 
     def get_channel_normaliser(self):
-        return ChannelNormaliser(depth=self.get_bifpn_depth(), n_extra=self.n_extra_downsample)
+        return ChannelNormaliser(depth=self.get_bifpn_depth())
 
     def get_bifpn_depth(self):
         return int(EfficientDetNetwork.base_depth*(1.35**self.phi))

@@ -22,8 +22,7 @@ class Faces(efficient_det.datasets.dataset.Dataset):
         
         def mold_for_eval(x):
             bbox = x['faces']['bbox']
-            image = tf.image.resize(x['image'], (512, 512))
-            # image = tf.image.pad_to_bounding_box(image, 0, 0, 512, 512)
+            image, bbox, *_ = self.resize(x['image'], x['faces']['bbox'], None)
             labels = tf.zeros_like(bbox, dtype=tf.int32)[:, 0]
             return (image, {'labels': labels, 'bboxes': bbox})
 
@@ -66,40 +65,4 @@ class Faces(efficient_det.datasets.dataset.Dataset):
 
 
 if __name__ == '__main__':
-
-    import efficient_det.model as model
-    import efficient_det.datasets.train_data_prep as train_data_prep
-    # anchors
-    anchor_size = 3
-    aspects = [
-        (1., 1.),
-        (.75, 1.5),
-        (1.5, 0.75),
-    ]
-    anchors = model.build_anchors(anchor_size, num_levels=6, aspects=aspects)
-    net = model.EfficientDetNetwork(0, 80, anchors)
-    # dataset
-    prepper = train_data_prep.ImageBasicPreparation(overlap_percentage=0.3, min_scale=0.8, max_scale=1.2, target_shape=512)
-    iou_match_thresh = 0.3
-    dataset = Faces(
-        anchors=anchors,
-        augmentations=None,
-        basic_training_prep=prepper,
-        iou_thresh=iou_match_thresh,
-        batch_size=1)
-
-    k = 1
-    import numpy as np
-    boxes = []
-    invalid = []
-    for x, g in dataset.validation_set_for_final_eval():
-        shape = np.array(x.shape[:2])
-        shape = np.concatenate([shape, shape])[None]
-        boxes.append(g['bboxes'].numpy()*shape)
-        invalid.append(g['invalid'].numpy())
-    invalid = np.concatenate(invalid, axis=0)
-    print(np.sum(invalid))
-    print(np.sum(~invalid))
-    print(np.sum(invalid)/np.sum(~invalid))
-    boxes = np.concatenate(boxes, axis=0)
-    np.save('boxes', boxes)
+    pass

@@ -4,14 +4,14 @@ Object detection from scratch in tensorflow 2.4. Below are the best results so f
 
 
 ```
-Average Precision  (AP) @[ IoU=0.50:0.50 | area=   all | maxDets=100 ] = 0.314
-Average Precision  (AP) @[ IoU=0.50:0.50 | area= small | maxDets=100 ] = 0.223
-Average Precision  (AP) @[ IoU=0.50:0.50 | area=medium | maxDets=100 ] = 0.835
-Average Precision  (AP) @[ IoU=0.50:0.50 | area= large | maxDets=100 ] = 0.926
-Average Recall     (AR) @[ IoU=0.50:0.50 | area=   all | maxDets=100 ] = 0.400
-Average Recall     (AR) @[ IoU=0.50:0.50 | area= small | maxDets=100 ] = 0.319
-Average Recall     (AR) @[ IoU=0.50:0.50 | area=medium | maxDets=100 ] = 0.907
-Average Recall     (AR) @[ IoU=0.50:0.50 | area= large | maxDets=100 ] = 0.965
+ Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.334
+ Average Precision  (AP) @[ IoU=0.50:0.50 | area= small | maxDets=100 ] = 0.240
+ Average Precision  (AP) @[ IoU=0.50:0.50 | area=medium | maxDets=100 ] = 0.864
+ Average Precision  (AP) @[ IoU=0.50:0.50 | area= large | maxDets=100 ] = 0.921
+ Average Recall     (AR) @[ IoU=0.50:0.50 | area=   all | maxDets=100 ] = 0.424
+ Average Recall     (AR) @[ IoU=0.50:0.50 | area= small | maxDets=100 ] = 0.341
+ Average Recall     (AR) @[ IoU=0.50:0.50 | area=medium | maxDets=100 ] = 0.929
+ Average Recall     (AR) @[ IoU=0.50:0.50 | area= large | maxDets=100 ] = 0.951
 ```
 
 <div align="center">

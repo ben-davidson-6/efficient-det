@@ -2,9 +2,11 @@ import tensorflow as tf
 import math
 import random
 
+from efficient_det.constants import NUM_LEVELS
+
 
 class DetectionHead(tf.keras.layers.Layer):
-    def __init__(self, num_class, num_anchors, repeats, n_levels, depth=32):
+    def __init__(self, num_class, num_anchors, repeats, depth=32):
         super(DetectionHead, self).__init__()
         self.num_classifications = num_class * num_anchors
         self.num_anchors = num_anchors
@@ -13,13 +15,11 @@ class DetectionHead(tf.keras.layers.Layer):
             focal_init=False,
             n_out=num_anchors*4,
             repeats=repeats,
-            n_levels=n_levels,
             depth=depth,)
         self.class_net = FullyConnectedHead(
             focal_init=True,
             n_out=num_anchors*num_class,
             repeats=repeats,
-            n_levels=n_levels,
             depth=depth,)
 
     def call(self, inputs, training=None):
@@ -41,21 +41,21 @@ class DetectionHead(tf.keras.layers.Layer):
 
 class FullyConnectedHead(tf.keras.layers.Layer):
 
-    def __init__(self, focal_init, n_out, repeats, n_levels, depth):
+    def __init__(self, focal_init, n_out, repeats, depth):
         super(FullyConnectedHead, self).__init__()
         self.repeats = repeats
         self.depth = depth
         self.convs = [self.seperable_conv_layer() for _ in range(self.repeats)]
         initer = DetectionBiasInitialiser(n_out) if focal_init else tf.keras.initializers.Constant()
+        self.dropout = tf.keras.layers.Dropout(rate=0.05)
         self.classification_layer = tf.keras.layers.Conv2D(
             filters=n_out,
             kernel_size=1,
             use_bias=True,
             bias_initializer=initer,
             dtype=tf.float32)
-        self.dropout = tf.keras.layers.Dropout(rate=0.05)
 
-    def call(self, inputs, training=None):
+    def call(self, inputs, training=False):
         outputs = []
         for level, level_feats in enumerate(inputs):
             outputs.append(self.put_level_through_head(level_feats, level, training))
@@ -64,7 +64,7 @@ class FullyConnectedHead(tf.keras.layers.Layer):
     def put_level_through_head(self, x, level, training):
         for k, conv in enumerate(self.convs):
             if k != 0:
-                x = self.dropout(x)
+                x = self.dropout(x, training)
             x = conv(x)
         x = self.classification_layer(x)
         return x
@@ -80,13 +80,13 @@ class FullyConnectedHead(tf.keras.layers.Layer):
 
 
 class DetectionBiasInitialiser(tf.initializers.Initializer):
-    PRIOR_FOREGROUND = 0.05
+    PRIOR_FOREGROUND = 0.001
 
     def __init__(self, n):
         self.initialisation = []
         pi = DetectionBiasInitialiser.PRIOR_FOREGROUND
         prior = -math.log((1 - pi) / pi)
-        self.initialisation = tf.ones([n])*prior + tf.random.uniform([n])*0.01
+        self.initialisation = tf.ones([n])*prior
         
     def __call__(self, shape, dtype=None):
         return self.initialisation

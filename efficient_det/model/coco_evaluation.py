@@ -160,6 +160,7 @@ if __name__ == '__main__':
     import efficient_det.datasets.train_data_prep as prep
     import matplotlib.pyplot as plt
 
+    # anchors
     anchor_size = 1.
     base_aspects = [
         (1., 1.),
@@ -172,28 +173,33 @@ if __name__ == '__main__':
         scale = 2**(octave / n_octave)
         for aspect in base_aspects:
             aspects.append((aspect[0] * scale, aspect[1] * scale))
-    num_levels = 6
     anchors = model.build_anchors(
         anchor_size,
-        num_levels=num_levels,
         aspects=aspects)
 
-    prepper = prep.ImageBasicPreparation(
-        min_scale=0.5,
-        overlap_percentage=0.3,
-        max_scale=1.2,
-        target_shape=512)
-    ds = wider_face.Faces(anchors, lambda x,y,z: (x,y,z), prepper, 0.5, 0.4, 1)
+    image_size = 512 + 128
+    ds = wider_face.Faces(
+        anchors=anchors,
+        augmentations=lambda x, y, z: (x, y, z),
+        image_size=image_size,
+        pos_iou_thresh=0.5,
+        neg_iou_thresh=0.5,
+        batch_size=1)
 
     # network
     phi = 0
     num_classes = 1
-    efficient_det = model.EfficientDetNetwork(phi, num_classes, anchors, n_extra_downsamples=3)
-    efficient_det.load_weights('artifacts/Jan_10_133509/model/weights')
+    efficient_det = model.EfficientDetNetwork(phi, num_classes, anchors)
+    efficient_det.load_weights('artifacts/Jan_16_095906/model/weights')
     inference_net = model.InferenceEfficientNet(efficient_det)
     coco = CocoEvaluation(
         ds.validation_set_for_final_eval(),
         ds.categories(),
         coco_params={'iouThrs': np.array([0.5])})
+
     coco.evaluate_model(inference_net)
-    
+    for x, _ in ds.validation_set_for_final_eval():
+        boxes, score, label, valid_detections = inference_net(x[None])
+        x = p.draw_model_output(x, boxes, score, thresh=0.5)
+        plt.imshow(x[0])
+        plt.show()

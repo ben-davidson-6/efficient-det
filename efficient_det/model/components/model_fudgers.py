@@ -15,9 +15,9 @@ class DownsampleConv(tf.keras.layers.Layer):
 
 
 class Downsampler(tf.keras.layers.Layer):
-    def __init__(self, depth, n_extra):
+    def __init__(self, depth):
         super(Downsampler, self).__init__()
-        self.downsamplers = [DownsampleConv(depth) for _ in range(n_extra)]
+        self.downsamplers = [DownsampleConv(depth) for _ in range(efficient_det.DOWNSAMPLES)]
         self.downsamplers = tuple(self.downsamplers)
 
     def call(self, x, training=None):
@@ -42,9 +42,9 @@ class ChannelNormConv(tf.keras.layers.Layer):
 
 
 class ChannelNormaliser(tf.keras.layers.Layer):
-    def __init__(self, depth, n_extra):
+    def __init__(self, depth):
         super(ChannelNormaliser, self).__init__()
-        self.convs = [ChannelNormConv(depth) for _ in range(efficient_det.STARTING_LEVEL + n_extra)]
+        self.convs = [ChannelNormConv(depth) for _ in range(efficient_det.NUM_LEVELS)]
 
     def call(self, x, training=None):
         y = []

@@ -51,7 +51,9 @@ class EfficientDetLoss(tf.keras.losses.Loss):
         # add them all together sensibly
         fl = fl * self.weights[0] * training_mask
         bl = bl * self.weights[1] * positive_mask
-        reduction_axes = [1, 2, 3]        
+        reduction_axes = [1, 2, 3]
+        tf.debugging.check_numerics(fl, 'nan in fl')
+        tf.debugging.check_numerics(bl, 'nan in bl')
         return tf.reduce_sum(fl, axis=reduction_axes) + tf.reduce_sum(bl, axis=reduction_axes)
 
     def huber_loss(self, y_true, y_pred):

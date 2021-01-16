@@ -10,7 +10,7 @@ class ClassPrecision(tf.keras.metrics.Metric):
 
     def update_state(self, y_true, y_pred, sample_weight=None):
         y_true = tf.cast(y_true[..., 0], tf.int64)
-        mask = efficient_det.IGNORE_LABEL != y_true
+        mask = tf.not_equal(y_true, efficient_det.IGNORE_LABEL)
         y_true = tf.one_hot(y_true, depth=self.num_classes)
         y_pred = tf.nn.sigmoid(y_pred[..., :self.num_classes])
         y_true = tf.boolean_mask(y_true, mask)
@@ -35,11 +35,13 @@ class ClassRecall(tf.keras.metrics.Metric):
 
     def update_state(self, y_true, y_pred, sample_weight=None):
         y_true = tf.cast(y_true[..., 0], tf.int64)
-        mask = efficient_det.IGNORE_LABEL != y_true
+        mask = tf.not_equal(y_true, efficient_det.IGNORE_LABEL)
         y_true = tf.one_hot(y_true, depth=self.num_classes)
         y_pred = tf.nn.sigmoid(y_pred[..., :self.num_classes])
         y_true = tf.boolean_mask(y_true, mask)
         y_pred = tf.boolean_mask(y_pred, mask)
+        # note 
+        # fix the empty case I think 
         self.recall.update_state(y_true, y_pred)
 
     def reset_states(self):
@@ -50,8 +52,6 @@ class ClassRecall(tf.keras.metrics.Metric):
 
     def get_config(self):
         return {'num_classes': self.num_classes}
-    
-    
 
 
 class AverageOffsetDiff(tf.keras.metrics.Metric):

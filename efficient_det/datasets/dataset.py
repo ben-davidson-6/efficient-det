@@ -6,6 +6,7 @@ from efficient_det.datasets.augs import Augmenter
 from efficient_det.datasets.train_data_prep import ImageBasicPreparation
 from efficient_det.geometry.box import TLBRBoxes
 from efficient_det.geometry.common import level_to_stride
+from efficient_det.constants import NUM_LEVELS
 
 
 class Dataset:
@@ -16,11 +17,11 @@ class Dataset:
             self,
             anchors: Anchors,
             augmentations: Augmenter,
-            basic_training_prep: ImageBasicPreparation,
+            image_size: int,
             pos_iou_thresh: float,
             neg_iou_thresh: float,
             batch_size: int):
-        self.basic_training_prep = basic_training_prep
+        self.image_size = image_size
         self.batch_size = batch_size
         self.anchors = anchors
         self.pos_iou_thresh = pos_iou_thresh
@@ -29,25 +30,36 @@ class Dataset:
 
     def training_set(self):
         ds = self._raw_training_set()
-        ds = ds.map(self.augmentations, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-        ds = ds.map(self.training_transform, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-        ds = ds.batch(self.batch_size).prefetch(tf.data.experimental.AUTOTUNE)
+        ds = ds.map(self.augmentations, num_parallel_calls=2)
+        ds = ds.map(self.training_transform, num_parallel_calls=2)
+        ds = ds.batch(self.batch_size).prefetch(1)
         return ds
 
-    @tf.function
     def training_transform(self, *args):
-        return self._build_offset_boxes(*self.basic_training_prep.scale_and_random_crop(*args))
+        return self._build_offset_boxes(*self.resize(*args))
 
     def validation_set(self):
         ds = self._raw_validation_set()
-        # todo fix this scale issue
-        ds = ds.map(self.training_transform, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-        ds = ds.batch(self.batch_size).prefetch(tf.data.experimental.AUTOTUNE)
+        ds = ds.map(self.training_transform, num_parallel_calls=2)
+        ds = ds.batch(self.batch_size).prefetch(1)
         return ds
 
-    @tf.function
     def validation_transform(self, *args):
-        return self._build_offset_boxes(*self._closest_acceptable_multiple(*args))
+        return self._build_offset_boxes(*self.resize(*args))
+
+    def resize(self, image, bbox, labels):
+        image = tf.image.resize(image, (self.image_size, self.image_size), preserve_aspect_ratio=True)
+        shape = tf.shape(image)
+        height, width = shape[0], shape[1]
+        to_pad_left = (self.image_size - width)//2
+        to_pad_top = (self.image_size - height)//2
+        offset = tf.cast(tf.stack([to_pad_top, to_pad_left]), tf.float32)
+        bbox = TLBRBoxes(bbox)
+        bbox.unnormalise(height, width)
+        bbox.add_offset(offset)
+        bbox.normalise(self.image_size, self.image_size)
+        image = tf.image.resize_with_crop_or_pad(image, self.image_size, self.image_size)
+        return image, bbox.tensor, labels
 
     def _build_offset_boxes(self, image, bboxes, labels):
         """offset is  a single tensor with final dim = 5 = class + regression"""
@@ -90,18 +102,11 @@ class Dataset:
 
     def _empty_offset(self, height, width):
         offset = []
-        # THE IGNORE LABEL HERE
-        for i in range(self.anchors.num_levels):
+        for i in range(NUM_LEVELS):
             stride = level_to_stride(i)
             empty_level = tf.ones([height // stride, width // stride, len(self.anchors.aspects), 5]) * efficient_det.IGNORE_LABEL
             offset.append(empty_level)
         return tuple(offset)
-
-    def _closest_acceptable_multiple(self, image, box, label):
-        # todo hack for the time being
-        image = tf.image.resize(image, (512, 512), preserve_aspect_ratio=True)
-        image = tf.image.pad_to_bounding_box(image, 0, 0, 512, 512)
-        return image, box, label
 
     @staticmethod
     def _empty_forced_offset(ious):
