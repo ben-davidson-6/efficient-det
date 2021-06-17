@@ -1,4 +1,4 @@
-# EfficientDet in Tensorflow 2.3: work in progress
+# EfficientDet in Tensorflow 2.4 from scratch
 
 Object detection from scratch in tensorflow 2.4. Below are the best results so far for the WiderFace dataset.
 
